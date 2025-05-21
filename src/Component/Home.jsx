@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import vnptImage from "../Assets/img/TOA NHA VNPT HGI_SKYCAM.jpg"; // Đảm bảo bạn đã có hình ảnh trong thư mục assets
 import UserService from "../Service/UserService";
+import { toast } from "react-toastify";
+import Header from "../Layout/Header";
 
 function Home() {
     const [list, SetList] = useState([])
@@ -8,6 +10,7 @@ function Home() {
         UserService.getAll().then(res => {
             console.log(res.data)
             SetList(Object.values(res.data))
+            toast.success("Thành công")
         })
         let user = { username: "tamle", passowrd: "1234" }
         UserService.update(user).then(
@@ -18,7 +21,7 @@ function Home() {
 },[])
   return (
     <div className="home">
-      {/* <Header /> */}
+      <Header />
       {/* Header */}
 
       {/* Banner */}
@@ -34,6 +37,10 @@ function Home() {
           <p>Uy tín, chất lượng và đổi mới</p>
         </div> */}
           </section>
+          <div className="container mt-5">
+      <h1 className="text-center mb-4">Chào mừng bạn đến với Bootstrap</h1>
+      <button className="btn btn-primary">Nhấn vào tôi</button>
+    </div>
           {
               list && list.map((item, index) => {
                   return (

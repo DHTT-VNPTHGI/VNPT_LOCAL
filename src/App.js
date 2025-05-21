@@ -1,8 +1,10 @@
 import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer, toast } from "react-toastify";
-
+import 'bootstrap/dist/css/bootstrap.min.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from "./Component/Home";
+import Login from "./Component/Login";
+import BrokenReportList from "./Component/ReportBroken/ReportBrokenList";
 
 
 function App() {
@@ -13,6 +15,9 @@ function App() {
           <Routes>
            
             <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            {/* ReportBroken */}
+            <Route path="/ReportBrokenList" element={<BrokenReportList />} />
           </Routes>{" "}
           <ToastContainer
             position="top-right"
