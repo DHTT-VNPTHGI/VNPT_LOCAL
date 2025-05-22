@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from "./Component/Home";
 import Login from "./Component/Login";
 import BrokenReportList from "./Component/ReportBroken/ReportBrokenList";
+import EmployeeManager from "./Component/Employee/EmployeeManager";
 
 
 function App() {
@@ -18,6 +19,8 @@ function App() {
             <Route path="/login" element={<Login />} />
             {/* ReportBroken */}
             <Route path="/ReportBrokenList" element={<BrokenReportList />} />
+            {/* Employee */}
+              <Route path="/EmployeeList" element={<EmployeeManager />} />
           </Routes>{" "}
           <ToastContainer
             position="top-right"

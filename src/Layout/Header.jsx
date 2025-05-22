@@ -49,6 +49,33 @@ function Header({ isLoggedIn, onLogin, onLogout, onSignUp }) {
                   </a>
                 </li>
               </ul>
+                      </li>
+                       <li className="nav-item dropdown">
+              <a
+                className="nav-link dropdown-toggle"
+                href="#!"
+                id="deviceDropdown"
+                role="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                Danh sách
+              </a>
+              <ul
+                className="dropdown-menu shadow-sm"
+                aria-labelledby="deviceDropdown"
+              >
+                <li>
+                  <NavLink className="dropdown-item" to="/EmployeeList" activeClassName="active">
+                    Danh sách nhân viên
+                </NavLink>
+                </li>
+                <li>
+                  <a className="dropdown-item" href="/software">
+                    Danh sách SW
+                  </a>
+                </li>
+              </ul>
             </li>
           </ul>
 
