@@ -158,7 +158,7 @@ function EmployeeManager() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-
+  <div style={{ overflowX: "auto" }}>
       <table className="table table-bordered table-hover">
         <thead className="table-primary">
           <tr>
@@ -204,7 +204,7 @@ function EmployeeManager() {
           )}
         </tbody>
       </table>
-
+</div>
       {/* Modal Thêm / Sửa */}
       {showModal && (
         <div

@@ -7,7 +7,7 @@ import Login from "./Component/Login";
 import BrokenReportList from "./Component/ReportBroken/ReportBrokenList";
 import EmployeeManager from "./Component/Employee/EmployeeManager";
 import SignUp from "./Component/SignUp";
-
+import "./App.css"
 
 function App() {
   return (

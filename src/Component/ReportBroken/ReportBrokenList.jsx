@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import Header from "../../Layout/Header";
 import BrokenReportService from "../../Service/BrokenReportService";
 import { toast } from "react-toastify";
+import Swal from "sweetalert2";
 
 function BrokenReportList() {
+  const users = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
   // Danh sách nhân viên mẫu
   const employees = [
     { id: "nv1", name: "Nguyễn Văn A" },
@@ -45,6 +47,7 @@ function BrokenReportList() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [filteredReports, setFilteredReports] = useState(reports);
+   const [listReports, setListReports] = useState([]);
 
   const [showModal, setShowModal] = useState(false);
 
@@ -84,7 +87,13 @@ function BrokenReportList() {
       );
     }
 
-    setFilteredReports(filtered);
+      BrokenReportService.getAll().then(
+      res => {
+        const data = Object.values(res.data)
+          setFilteredReports(data);
+          setListReports(data)
+      }
+    )
   }, [searchTerm, startDate, endDate, reports]);
 
   function generateRandomId(length = 10) {
@@ -95,6 +104,23 @@ function BrokenReportList() {
     }
     return result;
   }
+function formatDatetimeLocalToDDMMYYYY_HHMMSS(datetimeLocalStr) {
+  if (!datetimeLocalStr) return "";
+
+  const dt = new Date(datetimeLocalStr);
+
+  const pad = (num) => num.toString().padStart(2, "0");
+
+  const day = pad(dt.getDate());
+  const month = pad(dt.getMonth() + 1);
+  const year = dt.getFullYear();
+
+  const hours = pad(dt.getHours());
+  const minutes = pad(dt.getMinutes());
+  const seconds = pad(dt.getSeconds());
+
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+}
 
   const handleAddClick = () => {
     setNewCode("");
@@ -128,13 +154,14 @@ function BrokenReportList() {
       id: generateRandomId(),
     
       status: newStatus,
-      createdAt: newCreatedAt,
+      createdAt: formatDatetimeLocalToDDMMYYYY_HHMMSS(newCreatedAt),
       userReporter: newUserReporter,
       phone: newPhone,
       employee: newEmployee,
-      startAppointment: newStartAppointment,
-      endAppointment: newEndAppointment,
+      startAppointment: formatDatetimeLocalToDDMMYYYY_HHMMSS(newStartAppointment),
+      endAppointment: formatDatetimeLocalToDDMMYYYY_HHMMSS(newEndAppointment),
       reason: newReason,
+       timeCreate:formatDatetimeLocalToDDMMYYYY_HHMMSS(new Date())
       };
       console.log(newReport)
       BrokenReportService.update(newReport).then(
@@ -143,14 +170,66 @@ function BrokenReportList() {
               toast.success("Thêm dữ liệu thành công !!")
         }
     )
-    setReports((prev) => [newReport, ...prev]);
+    setFilteredReports((prev) => [newReport, ...prev]);
     setShowModal(false);
   };
 
   const handleEdit = (id) => {
-    alert(`Bạn muốn sửa báo hỏng có id=${id}`);
+    const item = filteredReports.filter(e => e.id == id)[0]
+    console.log(item)
   };
+  const handleCorrect = async(id,flag) => {
+    const item = listReports.filter(e => e.id == id)[0]
+    if (flag == true) {
+      item.status = "Đã duyệt"
+       BrokenReportService.update(item).then(
+      res => {
+        console.log(res.data)
+           toast.success("Duyệt phiếu hẹn thành công")
+           setListReports(prev =>
+      prev.map(r => (r.id === item.id ? { ...r, status: item.status } : r))
+    );
+      }
+    )
+    }
+      
+    else {
+      item.status = "Không duyệt"
+      const result = await Swal.fire({
+        title: "Bạn có chắc chắn không duyệt phiếu báo hỏng ?",
+        text:
+          "Phiếu sẽ được chuyển vào mục không duyệt ",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Chấp nhận",
+        cancelButtonText: "Hủy",
+        customClass: {
+          popup: "my-swal-popup",
+          title: "my-swal-title",
+          content: "my-swal-content",
+          confirmButton: "my-swal-confirm-btn",
+          cancelButton: "my-swal-cancel-btn",
+        },
+      });
 
+      if (result.isConfirmed) {
+      BrokenReportService.update(item).then(
+          res => {
+            console.log(res.data)
+          toast.success("Không duyệt phiếu hẹn thành công!!!")
+          setListReports(prev =>
+      prev.map(r => (r.id === item.id ? { ...r, status: item.status } : r))
+    );
+          }
+        )
+      } else {
+        console.log("Người dùng hủy chuyển pon");
+      }
+    }
+
+  };
   const handleDelete = (id) => {
     if (window.confirm("Bạn có chắc muốn xóa báo hỏng này?")) {
       setReports((prev) => prev.filter((r) => r.id !== id));
@@ -164,9 +243,12 @@ function BrokenReportList() {
         <h2>Danh sách Báo hỏng</h2>
 
         <div className="d-flex justify-content-between align-items-center my-3 flex-wrap gap-2">
-          <button className="btn btn-success" onClick={handleAddClick}>
+          {users&&users.role == "Admin" && (
+              <button className="btn btn-success" onClick={handleAddClick}>
             Thêm mới
           </button>
+          )}
+        
 
           <input
             type="text"
@@ -192,7 +274,7 @@ function BrokenReportList() {
             placeholder="Đến ngày"
           />
         </div>
-
+        <div style={{ overflowX: "auto" }}>
         <table className="table table-bordered table-hover">
           <thead className="table-primary">
             <tr>
@@ -206,7 +288,7 @@ function BrokenReportList() {
               <th>Thời gian kết thúc hẹn</th>
                           <th>Lý do hẹn</th>
                            <th>Trạng thái</th>
-              <th style={{ width: 150 }}>Thao tác</th>
+              <th >Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -217,7 +299,7 @@ function BrokenReportList() {
                 </td>
               </tr>
             ) : (
-              filteredReports.map((report) => (
+              listReports.map((report) => (
                 <tr key={report.id}>
                  
                 
@@ -225,29 +307,54 @@ function BrokenReportList() {
                   <td>{report.userReporter}</td>
                   <td>{report.phone}</td>
                   <td>{employees.find((e) => e.id === report.employee)?.name || report.employee}</td>
-                  <td>{report.startAppointment.replace("T", " ")}</td>
-                  <td>{report.endAppointment.replace("T", " ")}</td>
+                  <td>{report.startAppointment}</td>
+                  <td>{report.endAppointment}</td>
                       <td>{report.reason}</td>
                         <td>{report.status}</td>
                   <td>
-                    <button
-                      className="btn btn-sm btn-warning me-2"
-                      onClick={() => handleEdit(report.id)}
-                    >
-                      Sửa
-                    </button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => handleDelete(report.id)}
-                    >
-                      Xóa
-                    </button>
+                    {
+                      users && users.role == "Admin" ?
+                        <>
+                            <button
+                            className="btn btn-sm btn-warning me-2"
+                            onClick={() => handleEdit(report.id)}
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDelete(report.id)}
+                          >
+                            Xóa
+                          </button>
+                        </>
+                        :
+                        <>
+                           <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-sm btn-success"
+                              onClick={() => handleCorrect(report.id, true)}
+                            >
+                              Duyệt hẹn
+                            </button>
+                            <button
+                              className="btn btn-sm btn-danger"
+                              onClick={() => handleCorrect(report.id, false)}
+                            >
+                              Không duyệt
+                            </button>
+                          </div>
+                        </>
+                      
+                    }
+                
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+    </div>
       </div>
 
       {/* Modal thêm mới */}

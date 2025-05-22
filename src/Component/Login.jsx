@@ -37,14 +37,14 @@ function Login(props) {
       <h2 className="mb-4 text-center">Đăng nhập</h2>
       <form onSubmit={handleSubmit}>
         <div className="mb-3">
-          <label htmlFor="loginusername" className="form-label">username</label>
+          <label htmlFor="loginusername" className="form-label">Tên đăng nhập</label>
           <input
             type="text"
             className="form-control"
             id="loginusername"
             value={username}
             onChange={e => setusername(e.target.value)}
-            placeholder="Nhập username"
+            placeholder="Nhập tên đăng nhập"
             required
           />
         </div>
