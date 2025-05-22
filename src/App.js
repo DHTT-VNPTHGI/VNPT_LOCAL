@@ -6,6 +6,7 @@ import Home from "./Component/Home";
 import Login from "./Component/Login";
 import BrokenReportList from "./Component/ReportBroken/ReportBrokenList";
 import EmployeeManager from "./Component/Employee/EmployeeManager";
+import SignUp from "./Component/SignUp";
 
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
            
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/signUp" element={<SignUp />} />
             {/* ReportBroken */}
             <Route path="/ReportBrokenList" element={<BrokenReportList />} />
             {/* Employee */}

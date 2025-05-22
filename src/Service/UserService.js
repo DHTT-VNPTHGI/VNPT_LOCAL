@@ -13,12 +13,12 @@
           }
     update(data) {
           console.log(data)
-        const url = `/${SCHEMA}/${data.username}.json`;
+        const url = `/${SCHEMA}/${data.id}.json`;
         return axiosClient.patch(url, data);
       }
       delete(data) {
       
-      const url = `/${SCHEMA}/${data.username}.json`;
+      const url = `/${SCHEMA}/${data.id}.json`;
       return axiosClient.delete(url, data);
     
     }

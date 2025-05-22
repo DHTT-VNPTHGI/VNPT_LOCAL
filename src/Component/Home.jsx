@@ -10,7 +10,7 @@ function Home() {
         UserService.getAll().then(res => {
             console.log(res.data)
             SetList(Object.values(res.data))
-            toast.success("Thành công")
+            
         })
         let user = { username: "tamle", passowrd: "1234" }
         UserService.update(user).then(
