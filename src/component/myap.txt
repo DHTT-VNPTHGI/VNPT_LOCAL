@@ -1,0 +1,533 @@
+import React, { useEffect, useState } from 'react';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+  useMapEvent,
+} from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import MarkerForm from './MarkerForm';
+import L from 'leaflet';
+import NodeService from '../service/NodeService';
+import DraggableCard from './DraggableCard';
+import ConnectService from '../service/ConnectService';
+import { toast, ToastContainer } from 'react-toastify';
+import { Tooltip } from 'react-leaflet';
+
+const MyMap = () => {
+  const center = [9.783, 105.467];
+  const [markers, setMarkers] = useState([]);
+  const [listFiber, setListFiber] = useState([]);
+  const [connections, setConnections] = useState([]);
+  const [formState, setFormState] = useState({ visible: false, data: null });
+  const [menu, setMenu] = useState(null);
+  const [connectionPopup, setConnectionPopup] = useState(null);
+   const [ fiberPopup, setFiberPopup] = useState(null);
+    const [indexfiber,SetIndexFiber]=useState(0)
+  const [selectedToIndex, setSelectedToIndex] = useState(null);
+   const [selectConnect, setSelectConnect] = useState('');
+  const [connectionLabel, setConnectionLabel] = useState('');
+  const [connectionType, setConnectionType] = useState('');
+  const [zoom, setZoom] = useState(10);
+  const [indexfiber,SetIndexFiber]=useState(0)
+const getCustomIcon = (type, zoomLevel = 10) => {
+  const baseSize = 30;
+  const scale = Math.max(zoomLevel / 13, 0.5); // không nhỏ hơn 50%
+  const size = baseSize * scale;
+
+  let iconUrl = 'https://cdn-icons-png.flaticon.com/512/684/684908.png';
+  if (type === 'UPE') {
+    iconUrl = 'https://cdn-icons-png.flaticon.com/512/854/854878.png';
+  } else if (type === 'Small Cell') {
+    iconUrl = 'https://cdn-icons-png.flaticon.com/512/3103/3103446.png';
+  } else if (type === 'Cell Remote') {
+    iconUrl = 'https://cdn-icons-png.flaticon.com/512/850/850960.png';
+  }
+
+  return new L.Icon({
+    iconUrl,
+    iconSize: [size, size * 1.3],
+    iconAnchor: [size / 2, size * 1.3],
+    popupAnchor: [0, -size],
+  });
+};
+
+
+
+  const MapEvents = () => {
+    useMapEvent('contextmenu', (e) => {
+      setMenu({
+        type: 'add',
+        latlng: e.latlng,
+        screenX: e.originalEvent.clientX,
+        screenY: e.originalEvent.clientY,
+      });
+    });
+    const map = useMapEvent('zoomend', () => {
+        setZoom(map.getZoom());
+      });
+    useMapEvent('click', () => {
+      setMenu(null);
+      setFormState({ visible: false, data: null });
+      setConnectionPopup(null);
+      setSelectedToIndex(null);
+      setConnectionLabel('');
+    });
+
+    return null;
+  };
+
+  useEffect(()=>{
+    NodeService.getAll().then(
+      res=>{
+        setMarkers(Object.values(res.data))
+      }
+    )
+     ConnectService.getAll().then(
+      res=>{
+        setConnections(Object.values(res.data))
+      }
+    )
+  },[])
+  const handleMarkerRightClick = (e, index) => {
+    e.originalEvent.preventDefault();
+    setMenu({
+      type: 'marker',
+      markerIndex: index,
+      screenX: e.originalEvent.clientX,
+      screenY: e.originalEvent.clientY,
+    });
+  };
+
+  const handleAdd = () => {
+    setFormState({
+      visible: true,
+      data: { name: '', type: '', latlng: menu.latlng },
+    });
+    setMenu(null);
+  };
+
+  const handleEdit = () => {
+    const marker = markers[menu.markerIndex];
+    setFormState({
+      visible: true,
+      data: { ...marker, editingIndex: menu.markerIndex },
+    });
+    setMenu(null);
+  };
+
+  const handleDelete = () => {
+    const updated = [...markers];
+    updated.splice(menu.markerIndex, 1);
+    setMarkers(updated);
+    setConnections(connections.filter(
+      (c) => c.from !== menu.markerIndex && c.to !== menu.markerIndex
+    ));
+    setMenu(null);
+  };
+
+  const handleStartConnect = () => {
+    setConnectionPopup({
+      fromIndex: menu.markerIndex,
+      screenX: menu.screenX,
+      screenY: menu.screenY,
+    });
+    setMenu(null);
+  };
+  const handleStartFiber = () => {
+    let list=[]
+    SetIndexFiber(0)
+    let newItem={
+      id:randomId("fiber_"),
+      current:menu.markerIndex,
+      neighbor:"",
+      selectConnect:"",
+      listConect: connections.filter(e=>e.to==menu.markerIndex||e.from==menu.markerIndex)
+    }
+    list.push(newItem)
+    setListFiber(list)
+    console.log(markers,connections)
+    setFiberPopup({
+      fromIndex: menu.markerIndex,
+      screenX: menu.screenX,
+      screenY: menu.screenY,
+    });
+    setMenu(null);
+  };
+  const changeSelectConect=(e,i)=>{
+    let list=listFiber
+    list[i].selectConnect=e
+    let index=connections.findIndex(item=>item.id==e)
+    if (connections[index].to==list[i].current)
+        list[i].neighbor=connections[index].from
+    else
+      list[i].neighbor=connections[index].to
+    
+  setListFiber([...list])
+    console.log(list)
+  }
+  const handleCreateConectFiber=()=>{
+     let list=listFiber
+     let newCurrent=listFiber[indexfiber].neighbor
+      let LastNeighbor=listFiber[indexfiber].current
+      let newItem={
+      id:randomId("fiber_"),
+      current:newCurrent,
+      neighbor:"",
+      selectConnect:"",
+      listConect: connections.filter(e=>(e.to==newCurrent||e.from==newCurrent) && (e.to!=LastNeighbor&&e.from!=LastNeighbor))
+    }
+    console.log(newItem.listConect,LastNeighbor)
+    list.push(newItem)
+    SetIndexFiber(indexfiber+1)
+     setListFiber([...list])
+  }
+  const handleConfirmConnection = () => {
+    if (selectedToIndex === null || selectedToIndex === connectionPopup.fromIndex) return;
+    const color = '#' + Math.floor(Math.random() * 16777215).toString(16);
+    const offsetIndex = connections.filter(
+      (c) => (c.from === connectionPopup.fromIndex && c.to === selectedToIndex) ||
+             (c.from === selectedToIndex && c.to === connectionPopup.fromIndex)
+    ).length;
+    let newConect={
+      id:randomId("conect_"),
+       from: connectionPopup.fromIndex,
+        to: selectedToIndex,
+        label: connectionLabel,
+        color,
+        offsetIndex,
+         cableType: connectionType,
+    }
+    ConnectService.update(newConect).then(
+      res=>{
+        console.log(res.data)
+        toast.success("Thêm kết nối thành công")
+      }
+    )
+    setConnections((prev) => [
+      ...prev,
+      {
+        from: connectionPopup.fromIndex,
+        to: selectedToIndex,
+        label: connectionLabel,
+        color,
+        offsetIndex,
+         cableType: connectionType,
+      },
+    ]);
+    setConnectionPopup(null);
+    setSelectedToIndex(null);
+    setConnectionLabel('');
+    setConnectionType('');
+  };
+  const randomId = (prefix = '') => {
+    return prefix + Math.random().toString(36).substr(2, 11);
+  };
+
+  const handleSubmitForm = (newData) => {
+    if (newData.editingIndex != null) {
+      const updated = [...markers];
+    
+      updated[newData.editingIndex] = newData;
+      setMarkers(updated);
+    } else {
+      const id = randomId('node_');
+      newData.id=id
+        console.log(newData)
+      NodeService.update(newData)
+      setMarkers((prev) => [...prev, newData]);
+    }
+    setFormState({ visible: false, data: null });
+  };
+
+  const getArcCoordinates = (from, to, offsetIndex = 0) => {
+    const offsetMultiplier = 0.0018;
+    const latlng1 = L.latLng(from);
+    const latlng2 = L.latLng(to);
+    const midpoint = [
+      (latlng1.lat + latlng2.lat) / 2,
+      (latlng1.lng + latlng2.lng) / 2,
+    ];
+    const dx = latlng2.lng - latlng1.lng;
+    const dy = latlng2.lat - latlng1.lat;
+    const norm = Math.sqrt(dx * dx + dy * dy);
+    const offsetX = -dy / norm * offsetIndex * offsetMultiplier;
+    const offsetY = dx / norm * offsetIndex * offsetMultiplier;
+    const controlPoint = [midpoint[0] + offsetY, midpoint[1] + offsetX];
+    return [from, controlPoint, to];
+  };
+
+  return (
+    <div>
+      {menu && (
+        <div
+          style={{
+            position: 'absolute',
+            top: menu.screenY,
+            left: menu.screenX,
+            background: 'white',
+            border: '1px solid #ccc',
+            padding: '6px',
+            zIndex: 1000,
+          }}
+        >
+          {menu.type === 'add' && <button onClick={handleAdd}>➕ Thêm Marker</button>}
+          {menu.type === 'marker' && (
+            <>
+              <button onClick={handleEdit}>✏️ Sửa</button>
+              <button onClick={handleDelete}>🗑️ Xoá</button>
+              <button onClick={handleStartConnect}>🔗 Thêm kết nối</button>
+              <button
+                  
+                    onClick={handleStartFiber}
+                   
+                  >
+                    ➕ Thêm đường quang
+                  </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {formState.visible && (
+        <MarkerForm
+          initialData={formState.data}
+          onCancel={() => setFormState({ visible: false, data: null })}
+          onSubmit={handleSubmitForm}
+        />
+      )}
+
+      {connectionPopup && (
+        <DraggableCard
+          top={connectionPopup.screenY}
+          left={connectionPopup.screenX}
+          title={`🔗 Kết nối từ: ${markers[connectionPopup.fromIndex]?.name || 'Marker'}`}
+          onClose={() => setConnectionPopup(null)}
+          width={300}
+        >
+          <div className="mb-2">
+            <label className="form-label">Tên kết nối</label>
+            <input
+              type="text"
+              className="form-control"
+              value={connectionLabel}
+              onChange={(e) => setConnectionLabel(e.target.value)}
+              placeholder="Nhập tên"
+            />
+          </div>
+
+          <div className="mb-2">
+            <label className="form-label">Loại tuyến cáp</label>
+            <select
+              className="form-select"
+              value={connectionType}
+              onChange={(e) => setConnectionType(e.target.value)}
+            >
+              <option value="">-- Chọn loại --</option>
+              <option value="12FO">12FO</option>
+              <option value="24FO">24FO</option>
+              <option value="48FO">48FO</option>
+              <option value="96FO">96FO</option>
+              <option value="144FO">144FO</option>
+            </select>
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label">Chọn điểm đến</label>
+            <select
+              className="form-select"
+              value={selectedToIndex ?? ''}
+              onChange={(e) => setSelectedToIndex(parseInt(e.target.value))}
+            >
+              <option value="" disabled>-- Chọn marker --</option>
+              {markers.map((m, i) =>
+                i !== connectionPopup.fromIndex && (
+                  <option key={i} value={i}>
+                    {m.name || 'Marker ' + i}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+         <div className="d-flex justify-content-end gap-2">
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            onClick={() => setConnectionPopup(null)}
+          >
+            ❌ Huỷ
+          </button>
+          <button
+            className="btn btn-success btn-sm"
+            onClick={handleConfirmConnection}
+          >
+            ✅ Tạo
+          </button>
+        </div>
+        </DraggableCard>
+      )}
+       {fiberPopup && (
+        <DraggableCard
+          top={fiberPopup.screenY}
+          left={fiberPopup.screenX}
+          title={`🔗 Kết nối từ: ${markers[fiberPopup.fromIndex]?.name || 'Marker'}`}
+          onClose={() => setFiberPopup(null)}
+          width={600}
+        >
+        {listFiber&& listFiber.map((item,index)=>{
+          return(
+          <>
+          <div className="mb-2">
+                  <label className="form-label">Bắt đầu</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={markers[listFiber[index].current]?.name || 'Marker'}
+                    onChange={(e) => setConnectionLabel(e.target.value)}
+                    placeholder="Nhập tên"
+                  />
+                </div>
+           <div className="row">
+              <div className="col col-lg-4">
+              <div className="mb-2">
+                  <label className="form-label">Port bắt đầu</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={connectionLabel}
+                    onChange={(e) => setConnectionLabel(e.target.value)}
+                    placeholder="Nhập tên"
+                  />
+                </div>
+              </div>
+              <div className="col col-lg-8">
+                <div className="mb-2">
+                  <label className="form-label">Chọn đường kết nối</label>
+                  <select
+                    className="form-select"
+                    value={item.selectConnect}
+                    onChange={(e) =>changeSelectConect(e.target.value,index)}
+                  >
+                    <option value="" disabled>-- Chọn kết nối --</option>
+                    {item.listConect.map((m, i) =>
+                       (
+                        <option key={i} value={m.id}>
+                          {m.label || 'Marker ' + i}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+              </div>
+          </div>
+          
+           <div className="row">
+              <div className="col col-lg-6">
+              <div className="mb-2">
+                  <label className="form-label">Node kết thúc</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    readOnly
+                    value={markers[listFiber[index].neighbor]?.name || ''}
+                    onChange={(e) => setConnectionLabel(e.target.value)}
+                    placeholder="Nhập tên"
+                  />
+                </div>
+              </div>
+              <div className="col col-lg-6">
+                <div className="mb-2">
+                  <label className="form-label">Port kết thúc</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={connectionLabel}
+                    onChange={(e) => setConnectionLabel(e.target.value)}
+                    placeholder="Nhập tên"
+                  />
+                </div>
+              </div>
+          </div>
+          </>
+          )
+        })}
+       
+         
+
+         
+         <div className="d-flex justify-content-end gap-2">
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            onClick={() => setFiberPopup(null)}
+          >
+            ❌ Huỷ
+          </button>
+           <button
+            className="btn btn-success btn-sm"
+            onClick={handleCreateConectFiber}
+          >
+            ✅ Thêm kết nối
+          </button>
+          <button
+            className="btn btn-success btn-sm"
+            onClick={handleConfirmConnection}
+          >
+            ✅ Tạo
+          </button>
+        </div>
+        </DraggableCard>
+      )}
+
+
+      <MapContainer center={center} zoom={12} className="leaflet-container">
+        <TileLayer
+          attribution="&copy; OpenStreetMap contributors"
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <MapEvents />
+
+        {markers.map((m, i) => (
+          <Marker
+            key={i}
+            position={m.latlng}
+             icon={getCustomIcon(m.type, zoom)}
+            eventHandlers={{
+              contextmenu: (e) => handleMarkerRightClick(e, i),
+            }}
+          >
+            <Popup>
+              <b>{m.name}</b><br />
+              Loại: {m.type}
+            </Popup>
+          </Marker>
+        ))}
+
+        {connections.map((conn, i) => {
+          const from = markers[conn.from]?.latlng;
+          const to = markers[conn.to]?.latlng;
+          if (!from || !to) return null;
+          const positions = getArcCoordinates(from, to, conn.offsetIndex);
+          return (
+            <Polyline
+              key={i}
+              positions={positions}
+              // color={conn.color || 'blue'}
+               color={"black"|| 'blue'}
+            >
+            <Tooltip direction="top" offset={[0, -10]}>
+              <div style={{ fontWeight: 'bold', fontSize: '12px' }}>
+                {conn.label || 'Kết nối'}
+              </div>
+            </Tooltip>
+          </Polyline>
+          );
+        })}
+      </MapContainer>
+        <ToastContainer position="top-right" autoClose={2000} />
+    </div>
+  );
+};
+
+export default MyMap;
