@@ -23,6 +23,7 @@ const MyMap = () => {
   const [markers, setMarkers] = useState([]);
   const [listFiber, setListFiber] = useState([]);
   const [connections, setConnections] = useState([]);
+   const [connectionolds, setConnectionolds] = useState([]);
   const [DetailConnections, setDetailConnections] = useState([]);
   const [formState, setFormState] = useState({ visible: false, data: null });
   const [menu, setMenu] = useState(null);
@@ -36,8 +37,10 @@ const MyMap = () => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [selectedConnection, setSelectedConnection] = useState(null);
-   const [PortSelected, setPortSelected] = useState(null);
+   const [PortSelected, setPortSelected] = useState({});
   const [selectedPort, setSelectedPort] = useState(null);
+const [showDisconnectButton, setShowDisconnectButton] = useState(false);
+const [flag, setflag] = useState(false);
 
     const handleOpenModal = (e,marker) => {
       console.log(marker)
@@ -90,7 +93,7 @@ const findNameConectFiberById=(id)=>{
  FiberService.getAll().then(
   res=>{
     console.log(Object.values(res.data).filter(e=>e.id==id))
-    setPortSelected(Object.values(res.data).filter(e=>e.id==id)[0].name)
+    setPortSelected(Object.values(res.data).filter(e=>e.id==id)[0])
 
   }
  )
@@ -123,8 +126,17 @@ const findNameConectFiberById=(id)=>{
 
   useEffect(() => {
     NodeService.getAll().then(res => setMarkers(res.data?Object.values(res.data):[]));
-    ConnectService.getAll().then(res => setConnections(res.data?Object.values(res.data):[]));
-  }, []);
+    ConnectService.getAll().then(res => 
+      
+      {
+      setConnections(res.data?Object.values(res.data):[])
+      setConnectionolds(res.data?Object.values(res.data):[])
+      }
+      
+ 
+    
+    );
+  }, [flag]);
 
   const handleMarkerRightClick = (e, markerId) => {
     e.originalEvent.preventDefault();
@@ -145,10 +157,44 @@ const findNameConectFiberById=(id)=>{
   };
 
   const handleDelete = () => {
+    const updateds = markers.filter(m => m.id == menu.markerId);
+    console.log(updateds[0])
+    NodeService.delete(updateds[0]).then(
+      res=>{
+        toast.success("Xóa Node thành công !!!")
+      }
+    )
     const updated = markers.filter(m => m.id !== menu.markerId);
+    connections.filter(c => c.from == menu.markerId || c.to == menu.markerId).map((item,inex)=>{
+                FiberService.getAll().then(
+                  res=>{
+                    Object.values(res.data).filter(e=>e.node_end==menu.markerId||e.node_start==menu.markerId).map((fiberdl,index)=>{
+                      FiberService.delete(fiberdl)
+                    })
+                  }
+                )
+
+                FiberDetailService.getAll().then(
+                  res=>{
+                    Object.values(res.data).filter(e=>e.id_connect==item.id).map((fiberdl,index)=>{
+                      FiberDetailService.delete(fiberdl)
+                    })
+                  }
+                )
+                ConnectService.delete(item).then(res=>{
+                  
+
+                })
+                
+              
+    }
+      
+    )
+
     setMarkers(updated);
     setConnections(connections.filter(c => c.from !== menu.markerId && c.to !== menu.markerId));
     setMenu(null);
+
   };
 
   const handleStartConnect = () => {
@@ -312,7 +358,68 @@ const findNameConectFiberById=(id)=>{
     const controlPoint = [midpoint[0] + offsetY, midpoint[1] + offsetX];
     return [from, controlPoint, to];
   };
+  const viewDetailConect=()=>{
+     setShowDisconnectButton(true);
+    console.log(PortSelected)
+    FiberService.getAll().then(res=>{
+      console.log(res.data)
+    })
+    FiberDetailService.getAll().then(res=>{
+       ConnectService.getAll().then(
+        ress=>{
+          let list=[]
+          let list_node=[]
+          Object.values(res.data).filter(e=>e.id_fiber==PortSelected.id).map((item,index)=>{
+            let connect=Object.values(ress.data).filter(e=>e.id==item.id_connect)[0]
+            console.log(item)
+            list.push(connect)
+            setConnections([...list])
+            
+         
 
+          })
+          NodeService.getAll().then(
+                      ress=>{
+                        console.log(list)
+                        list.map((items,index)=>{
+                        let node=Object.values(ress.data).filter(e=>e.id==items.from)[0]
+                        let node_to=Object.values(ress.data).filter(e=>e.id==items.to)[0]
+                        if (list_node.findIndex(e=>e.id==node.id)<0){
+                          list_node.push(node)
+                        }
+                          if (list_node.findIndex(e=>e.id==node_to.id)<0){
+                          list_node.push(node_to)
+                        }
+                      console.log(list_node)
+                      setMarkers([...list_node])
+                        })
+                        
+                      }
+                    )
+        
+      }
+    )
+     
+    })
+   
+    
+    setSelectedPort(null)
+    setSelectedConnection(null)
+  }
+  const handleDisconnect=()=>{
+    //   ConnectService.getAll().then(
+    //     res=>{
+        
+
+    //        setConnections( Object.values(res.data))
+        
+
+        
+    //   }
+    // )
+    setflag(!flag)
+      setShowDisconnectButton(false);
+  }
   return (
     <div>
     {menu && (
@@ -700,13 +807,13 @@ const findNameConectFiberById=(id)=>{
                   </tr>
                   <tr>
                     <th>🔗 Tên kết nối</th>
-                    <td>{PortSelected || 'Không có'}</td>
+                    <td>{PortSelected.name || 'Không có'}</td>
                   </tr>
                 </tbody>
               </table>
 
               <div className="text-end">
-                <button className="btn btn-primary btn-sm">
+                <button className="btn btn-primary btn-sm" onClick={viewDetailConect}>
                   🔍 Xem chi tiết
                 </button>
               </div>
@@ -714,7 +821,15 @@ const findNameConectFiberById=(id)=>{
 
             </DraggableCard>
           )}
-
+{showDisconnectButton && (
+  <button
+    className="btn btn-danger btn-sm position-fixed"
+    style={{ top: '20px', right: '20px', zIndex: 1050 }}
+    onClick={handleDisconnect}
+  >
+    🔌 Đóng 
+  </button>
+)}
       <MapContainer center={center} zoom={12} className="leaflet-container">
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
