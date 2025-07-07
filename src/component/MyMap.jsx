@@ -152,6 +152,7 @@ const findNameConectFiberById=(id)=>{
   const handleEdit = () => {
     const marker = markers.find(m => m.id === menu.markerId);
     const editingIndex = markers.findIndex(m => m.id === menu.markerId);
+    console.log(marker,editingIndex)
     setFormState({ visible: true, data: { ...marker, editingIndex } });
     setMenu(null);
   };
@@ -335,11 +336,20 @@ const findNameConectFiberById=(id)=>{
     if (newData.editingIndex != null) {
       const updated = [...markers];
       updated[newData.editingIndex] = newData;
+      console.log(updated[0])
+      NodeService.update(updated[0]).then(
+        res=>{
+          toast.success("Cập nhật thông tin thành công")
+        }
+      );
       setMarkers(updated);
     } else {
       const id = randomId('node_');
       newData.id = id;
-      NodeService.update(newData);
+      NodeService.update(newData).then(
+        res=>{
+          toast.success("Thêm thông tin thành công")
+        })
       setMarkers((prev) => [...prev, newData]);
     }
     setFormState({ visible: false, data: null });
@@ -845,7 +855,7 @@ const findNameConectFiberById=(id)=>{
             contextmenu: (e) => handleMarkerRightClick(e, m.id) }}
             
           >
-             <Tooltip direction="bottom" offset={[0, -10]} permanent>
+             <Tooltip direction="bottom" offset={[0, -10]} permanent interactive={false}>
               <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{m.name}</div>
             </Tooltip>
             {/* <Popup>
@@ -868,7 +878,7 @@ const findNameConectFiberById=(id)=>{
                     }}
             
             >
-              <Tooltip direction="top" offset={[0, -10]}>
+              <Tooltip direction="top" offset={[0, -10]} interactive={false}>
                 <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{conn.label || 'Kết nối'}</div>
               </Tooltip>
             </Polyline>
