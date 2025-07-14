@@ -449,13 +449,13 @@ const findNameConectFiberById=(id)=>{
             <>
               <button onClick={handleEdit}>✏️ Sửa</button>
               <button onClick={handleDelete}>🗑️ Xoá</button>
-              <button onClick={handleStartConnect}>🔗 Thêm kết nối</button>
+              <button onClick={handleStartConnect}>🔗Thêm tuyến quang </button>
               <button
                   
                     onClick={handleStartFiber}
                    
                   >
-                    ➕ Thêm đường quang
+                    ➕ Thêm kết nối
                   </button>
             </>
           )}
@@ -571,13 +571,13 @@ const findNameConectFiberById=(id)=>{
               <div className="row">
                 <div className="col col-lg-4">
                   <div className="mb-2">
-                    <label className="form-label">Port bắt đầu</label>
+                    <label className="form-label">Điểm bắt đầu</label>
                     <input
                       type="text"
                       className="form-control"
                       value={item.portStart}
                       onChange={(e) => changePortStart(e.target.value, index)}
-                      placeholder="Nhập Port bắt đầu"
+                      placeholder="Nhập điểm bắt đầu"
                     />
                   </div>
                 </div>
@@ -603,13 +603,13 @@ const findNameConectFiberById=(id)=>{
               <div className="row">
                 <div className="col col-lg-4">
                   <div className="mb-2">
-                    <label className="form-label">Node kết thúc</label>
+                    <label className="form-label">Điểm kết thúc</label>
                     <input
                       type="text"
                       className="form-control"
                       readOnly
                       value={markers.find(m => m.id === item.neighbor)?.name || ''}
-                      placeholder="Nhập tên"
+                      placeholder="Nhập Điểm kết thúc"
                     />
                   </div>
                 </div>
