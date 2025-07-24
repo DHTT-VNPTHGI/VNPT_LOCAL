@@ -41,6 +41,7 @@ const MyMap = () => {
   const [selectedPort, setSelectedPort] = useState(null);
 const [showDisconnectButton, setShowDisconnectButton] = useState(false);
 const [flag, setflag] = useState(false);
+const [spliceForm, setSpliceForm] = useState(null);
 
     const handleOpenModal = (e,marker) => {
       console.log(marker)
@@ -66,7 +67,7 @@ const [flag, setflag] = useState(false);
   const handleConnectionClick = (connection) => {
   FiberDetailService.getAll().then(
     res=>{
-      let listFilter=Object.values(res.data).filter(e=>e.id_connect==connection.id)
+      let listFilter=res.data?Object.values(res.data).filter(e=>e.id_connect==connection.id):[]
       console.log(listFilter)
       const cableCount = parseInt(connection.cableType);
       const listcableCount = Array.from({ length: cableCount }, (_, i) => ({
@@ -110,28 +111,48 @@ const findNameConectFiberById=(id)=>{
     return new L.Icon({ iconUrl, iconSize: [size, size * 1.3], iconAnchor: [size / 2, size * 1.3], popupAnchor: [0, -size] });
   };
 
-  const MapEvents = () => {
-    const map = useMapEvent('zoomend', () => setZoom(map.getZoom()));
-    useMapEvent('contextmenu', (e) => {
-      setMenu({ type: 'add', latlng: e.latlng, screenX: e.originalEvent.clientX, screenY: e.originalEvent.clientY });
-    });
-    useMapEvent('click', () => {
+  // const MapEvents = () => {
+  //   const map = useMapEvent('zoomend', () => setZoom(map.getZoom()));
+  //   useMapEvent('contextmenu', (e) => {
+  //     setMenu({ type: 'add', latlng: e.latlng, screenX: e.originalEvent.clientX, screenY: e.originalEvent.clientY });
+  //   });
+  //   useMapEvent('click', () => {
+  //     setMenu(null);
+  //     setFormState({ visible: false, data: null });
+  //     setConnectionPopup(null);
+  //     setSelectedToIndex(null);
+  //     setConnectionLabel('');
+  //   });
+  //   return null;
+  // };
+const MapEvents = () => {
+  useMapEvent('click', (e) => {
+    if (spliceForm) {
+      // Chỉ cập nhật khi form đang mở
+      setSpliceForm((prev) => ({
+        ...prev,
+        lat: e.latlng.lat,
+        lng: e.latlng.lng,
+      }));
+    } else {
       setMenu(null);
       setFormState({ visible: false, data: null });
-      setConnectionPopup(null);
-      setSelectedToIndex(null);
-      setConnectionLabel('');
-    });
-    return null;
-  };
+    }
+  });
+  return null;
+};
 
   useEffect(() => {
     NodeService.getAll().then(res => setMarkers(res.data?Object.values(res.data):[]));
     ConnectService.getAll().then(res => 
       
       {
-      setConnections(res.data?Object.values(res.data):[])
-      setConnectionolds(res.data?Object.values(res.data):[])
+        const connectionsWithSplice = Object.values(res.data || {}).map(conn => ({
+      ...conn,
+      splicePoints: conn.splicePoints || [] // fallback nếu không có
+    }));
+      setConnections(res.data?connectionsWithSplice:[])
+      setConnectionolds(res.data?connectionsWithSplice:[])
       }
       
  
@@ -398,7 +419,7 @@ const findNameConectFiberById=(id)=>{
   let listcableCount=DetailConnections
    FiberDetailService.getAll().then(res=>{
      Object.values(res.data).filter(e=>e.id_fiber==PortSelected.id).map((item,index)=>{
-      // FiberDetailService.delete(item)
+      FiberDetailService.delete(item)
       console.log(item)
 
      })
@@ -412,7 +433,7 @@ const findNameConectFiberById=(id)=>{
 
     FiberService.getAll().then(res=>{
      Object.values(res.data).filter(e=>e.id==PortSelected.id).map((item,index)=>{
-      // FiberService.delete(item)
+      FiberService.delete(item)
       console.log(item)
 
      })
@@ -492,7 +513,8 @@ const DeleteTuyenCap=()=>{
   console.log(selectedConnection)
   FiberDetailService.getAll().then(
     res=>{
-     let listFilter =Object.values(res.data).filter(e=>e.id_connect==selectedConnection.id)
+      if (res.data){
+  let listFilter =Object.values(res.data).filter(e=>e.id_connect==selectedConnection.id)
       console.log(listFilter)
       if (listFilter.length>0){
         toast.error("Không thể xóa Tuyến cáp. Do tồn tại kết nối quang!!!")
@@ -507,9 +529,48 @@ const DeleteTuyenCap=()=>{
         }
        )
       }
+      }
+    else{
+       ConnectService.delete(selectedConnection).then(
+        res=>{
+          toast.success("Xóa Cáp quang thành công !!")
+          setConnections(connections.filter(e=>e.id!=selectedConnection.id))
+          setSelectedConnection(null)
+         
+        }
+       )
+      }
     }
   )
 }
+const handleSaveSplicePoint = () => {
+  const updatedConnections = connections.map(conn => {
+    if (conn.id === spliceForm.connectionId) {
+      const newSplice = {
+        id: randomId("splice_"),
+        name: spliceForm.name || `Mối hàn ${conn.splicePoints?.length + 1 || 1}`,
+        latlng: [spliceForm.lat, spliceForm.lng],
+        order: (conn.splicePoints?.length || 0) + 1
+      };
+
+      const updatedConn = {
+        ...conn,
+        splicePoints: [...(conn.splicePoints || []), newSplice]
+      };
+
+      ConnectService.update(updatedConn); // nếu có backend
+      return updatedConn;
+    }
+    return conn;
+  });
+
+  setConnections(updatedConnections);
+  setSpliceForm(null);
+  toast.success("✅ Đã thêm mối hàn");
+};
+
+
+
   return (
     <div>
     {menu && (
@@ -959,26 +1020,114 @@ const DeleteTuyenCap=()=>{
           </Marker>
         ))}
       
+{spliceForm && (
+  <DraggableCard
+    title="➕ Thêm mối hàn"
+    onClose={() => setSpliceForm(null)}
+    width={300}
+  >
+    <div onClick={(e) => e.stopPropagation()}>
+      <div className="mb-2">
+        <label className="form-label">Tên mối hàn</label>
+        <input
+          type="text"
+          className="form-control"
+          value={spliceForm.name}
+          onChange={(e) =>
+            setSpliceForm({ ...spliceForm, name: e.target.value })
+          }
+        />
+      </div>
+      <div className="row mb-2">
+        <div className="col">
+          <label className="form-label">Lat</label>
+          <input
+            type="number"
+            className="form-control"
+            value={spliceForm.lat}
+            onChange={(e) =>
+              setSpliceForm({ ...spliceForm, lat: parseFloat(e.target.value) })
+            }
+          />
+        </div>
+        <div className="col">
+          <label className="form-label">Lng</label>
+          <input
+            type="number"
+            className="form-control"
+            value={spliceForm.lng}
+            onChange={(e) =>
+              setSpliceForm({ ...spliceForm, lng: parseFloat(e.target.value) })
+            }
+          />
+        </div>
+      </div>
+      <div className="d-flex justify-content-end gap-2">
+        <button className="btn btn-sm btn-secondary" onClick={() => setSpliceForm(null)}>
+          ❌ Hủy
+        </button>
+        <button className="btn btn-sm btn-success" onClick={handleSaveSplicePoint}>
+          💾 Lưu
+        </button>
+      </div>
+    </div>
+  </DraggableCard>
+)}
 
-        {connections.map((conn, i) => {
-          const from = markers.find(m => m.id === conn.from)?.latlng;
-          const to = markers.find(m => m.id === conn.to)?.latlng;
-          if (!from || !to) return null;
-          const positions = getArcCoordinates(from, to, conn.offsetIndex);
-          return (
-            <Polyline key={i} positions={positions} color={conn.color || 'black'}
-             eventHandlers={{
-                      click: () => handleConnectionClick(conn), // Hàm xử lý khi click vào đường nối
-                       contextmenu: (e) => handleRightClick(conn, e), 
-                    }}
-            
-            >
-              <Tooltip direction="top" offset={[0, -10]} interactive={false}>
-                <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{conn.label || 'Kết nối'}</div>
-              </Tooltip>
-            </Polyline>
-          );
-        })}
+
+
+{connections.map((conn, i) => {
+  const from = markers.find(m => m.id === conn.from)?.latlng;
+  const to = markers.find(m => m.id === conn.to)?.latlng;
+  if (!from || !to) return null;
+
+  const splicePoints = (conn.splicePoints || [])
+    .sort((a, b) => a.order - b.order)
+    .map(sp => sp.latlng);
+
+  const positions = [from, ...splicePoints, to];
+
+  return (
+    <Polyline
+      key={conn.id}
+      positions={positions}
+      color={conn.color || 'blue'}
+      weight={5}
+      eventHandlers={{
+        click: () => handleConnectionClick(conn),
+         contextmenu: (e) => {
+    e.originalEvent.preventDefault();
+    setSpliceForm({
+      connectionId: conn.id,
+      lat: e.latlng.lat,
+      lng: e.latlng.lng,
+      screenX: e.originalEvent.clientX,
+      screenY: e.originalEvent.clientY,
+      name: ''
+    });
+  }
+      }}
+    >
+      <Tooltip direction="top">{conn.label || 'Tuyến cáp'}</Tooltip>
+    </Polyline>
+  );
+})}
+
+{connections.flatMap(conn =>
+  (conn.splicePoints || []).map((sp, index) => (
+    <Marker
+      key={sp.id}
+      position={sp.latlng}
+      icon={L.divIcon({
+        className: 'splice-icon',
+        html: `<div style="background:#f00;width:10px;height:10px;border-radius:50%"></div>`,
+      })}
+    >
+      <Tooltip direction="top">{`Mối hàn #${index + 1}`}</Tooltip>
+    </Marker>
+  ))
+)}
+
       </MapContainer>
       <ToastContainer position="top-right" autoClose={2000} />
     </div>
