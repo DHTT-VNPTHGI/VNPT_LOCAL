@@ -81,6 +81,7 @@ const [flag, setflag] = useState(false);
         listcableCount[i].status=1
         listcableCount[i].id_fiber=item.id_fiber
       })
+      console.log(listcableCount)
       setDetailConnections(listcableCount)
     }
   )
@@ -160,7 +161,12 @@ const findNameConectFiberById=(id)=>{
   const handleDelete = () => {
     const updateds = markers.filter(m => m.id == menu.markerId);
     console.log(updateds[0])
-    NodeService.delete(updateds[0]).then(
+    let listFilter= connections.filter(c => c.from == menu.markerId || c.to == menu.markerId)
+    if (listFilter.length>0){
+      toast.error("Không thể xóa trạm. Do tồn tại Tuyến cáp!!!")
+    }
+    else{
+   NodeService.delete(updateds[0]).then(
       res=>{
         toast.success("Xóa Node thành công !!!")
       }
@@ -195,6 +201,8 @@ const findNameConectFiberById=(id)=>{
     setMarkers(updated);
     setConnections(connections.filter(c => c.from !== menu.markerId && c.to !== menu.markerId));
     setMenu(null);
+    }
+ 
 
   };
 
@@ -207,7 +215,7 @@ const findNameConectFiberById=(id)=>{
     const list = [];
     SetIndexFiber(0);
     const newItem = {
-      id: randomId("fiber_"),
+      id: randomId("fiberdetail_"),
       current: menu.markerId,
       neighbor: "",
       selectConnect: "",
@@ -287,6 +295,8 @@ const findNameConectFiberById=(id)=>{
    const changeSelectCableCount=(e,i)=>{
     let list=listFiber
     list[i].cableCount=e
+    list[i].portEnd=e
+    list[i].portStart=e
    
     
   setListFiber([...list])
@@ -309,7 +319,7 @@ const findNameConectFiberById=(id)=>{
      let newCurrent=listFiber[indexfiber].neighbor
       let LastNeighbor=listFiber[indexfiber].current
       let newItem={
-      id:randomId("fiber_"),
+      id:randomId("fiberdetail_"),
       current:newCurrent,
       neighbor:"",
       selectConnect:"",
@@ -343,15 +353,30 @@ const findNameConectFiberById=(id)=>{
         }
       );
       setMarkers(updated);
-    } else {
-      const id = randomId('node_');
-      newData.id = id;
-      NodeService.update(newData).then(
-        res=>{
-          toast.success("Thêm thông tin thành công")
-        })
-      setMarkers((prev) => [...prev, newData]);
-    }
+    } 
+    
+    
+    else {
+        const id = randomId('node_');
+        newData.id = id;
+
+        // Kiểm tra trùng latlng
+        const isDuplicate = markers.some(
+          (m) => m.latlng[0] === newData.latlng[0] && m.latlng[1] === newData.latlng[1]
+        );
+
+        if (isDuplicate) {
+          toast.error("⚠️  trạm "+newData.name+" đã tồn tại tại vị trí này!");
+          return;
+        }
+
+        NodeService.update(newData).then((res) => {
+          toast.success("✅ Thêm trạm "+newData.name+" thành công");
+        });
+
+        setMarkers((prev) => [...prev, newData]);
+      }
+
     setFormState({ visible: false, data: null });
   };
 
@@ -368,6 +393,34 @@ const findNameConectFiberById=(id)=>{
     const controlPoint = [midpoint[0] + offsetY, midpoint[1] + offsetX];
     return [from, controlPoint, to];
   };
+  const DeleteConnect =()=>{
+    console.log(DetailConnections,selectedPort)
+  let listcableCount=DetailConnections
+   FiberDetailService.getAll().then(res=>{
+     Object.values(res.data).filter(e=>e.id_fiber==PortSelected.id).map((item,index)=>{
+      // FiberDetailService.delete(item)
+      console.log(item)
+
+     })
+     toast.success("Xóa kết nối thành công")
+     let i=listcableCount.findIndex(e=>e.id==selectedPort.portNumber)
+    // listcableCount[i].id_fiber=""
+    listcableCount[i].status=0
+    setDetailConnections([...listcableCount])
+    
+   })
+
+    FiberService.getAll().then(res=>{
+     Object.values(res.data).filter(e=>e.id==PortSelected.id).map((item,index)=>{
+      // FiberService.delete(item)
+      console.log(item)
+
+     })
+
+   })
+   setSelectedPort(null)
+
+  }
   const viewDetailConect=()=>{
      setShowDisconnectButton(true);
     console.log(PortSelected)
@@ -430,6 +483,33 @@ const findNameConectFiberById=(id)=>{
     setflag(!flag)
       setShowDisconnectButton(false);
   }
+  const handleRightClick = (conn, event) => {
+  console.log('Right click on connection:', conn);
+  // Ví dụ: mở menu chuột phải, xoá, chỉnh sửa...
+};
+
+const DeleteTuyenCap=()=>{
+  console.log(selectedConnection)
+  FiberDetailService.getAll().then(
+    res=>{
+     let listFilter =Object.values(res.data).filter(e=>e.id_connect==selectedConnection.id)
+      console.log(listFilter)
+      if (listFilter.length>0){
+        toast.error("Không thể xóa Tuyến cáp. Do tồn tại kết nối quang!!!")
+      }
+      else{
+       ConnectService.delete(selectedConnection).then(
+        res=>{
+          toast.success("Xóa Cáp quang thành công !!")
+          setConnections(connections.filter(e=>e.id!=selectedConnection.id))
+          setSelectedConnection(null)
+         
+        }
+       )
+      }
+    }
+  )
+}
   return (
     <div>
     {menu && (
@@ -558,7 +638,7 @@ const findNameConectFiberById=(id)=>{
           {expandedIndex === index && (
             <>
               <div className="mb-2 mt-3">
-                <label className="form-label">Bắt đầu</label>
+                <label className="form-label">Trạm Bắt đầu</label>
                 <input
                   type="text"
                   className="form-control"
@@ -603,13 +683,13 @@ const findNameConectFiberById=(id)=>{
               <div className="row">
                 <div className="col col-lg-4">
                   <div className="mb-2">
-                    <label className="form-label">Điểm kết thúc</label>
+                    <label className="form-label">Trạm kết thúc</label>
                     <input
                       type="text"
                       className="form-control"
                       readOnly
                       value={markers.find(m => m.id === item.neighbor)?.name || ''}
-                      placeholder="Nhập Điểm kết thúc"
+                      // placeholder="Nhập Trạm kết thúc"
                     />
                   </div>
                 </div>
@@ -632,13 +712,13 @@ const findNameConectFiberById=(id)=>{
                 </div>
                 <div className="col col-lg-4">
                   <div className="mb-2">
-                    <label className="form-label">Port kết thúc</label>
+                    <label className="form-label">Điểm kết thúc</label>
                     <input
                       type="text"
                       className="form-control"
                       value={item.portEnd}
                       onChange={(e) => changePortEnd(e.target.value, index)}
-                      placeholder="Nhập Port kết thúc"
+                      placeholder="Nhập Điểm kết thúc"
                     />
                   </div>
                 </div>
@@ -734,7 +814,7 @@ const findNameConectFiberById=(id)=>{
           onClose={() => setSelectedConnection(null)}
           width={700}
         >
-          <div className="p-3">
+          <div className="p-2">
           <div className="table-responsive">
             <table className="table table-striped table-bordered align-middle text-center shadow-sm rounded">
               <thead className="table-primary">
@@ -759,7 +839,16 @@ const findNameConectFiberById=(id)=>{
             </table>
           </div>
         </div>
-        <div className="p-3">
+              <div className=" text-end">
+            <button
+              className="btn btn-danger"
+              onClick={() => DeleteTuyenCap()
+              }
+            >
+              🗑️ Xóa kết nối
+            </button>
+          </div>
+        <div className="p-1">
   <div className="mb-2 fw-bold">Trạng thái Port:</div>
   <div className="d-flex flex-wrap gap-2">
     {
@@ -794,7 +883,7 @@ const findNameConectFiberById=(id)=>{
           </div>
         </div>
 
-
+    
 
         </DraggableCard>
       )}
@@ -821,12 +910,17 @@ const findNameConectFiberById=(id)=>{
                   </tr>
                 </tbody>
               </table>
+           
+            <div className="text-end">
+                 <button className="btn btn-danger btn-sm me-2" onClick={DeleteConnect}>
+                🗑️ Xóa
+              </button>
+              <button className="btn btn-primary btn-sm " onClick={viewDetailConect}>
+                🔍 Xem chi tiết
+              </button>
+           
+            </div>
 
-              <div className="text-end">
-                <button className="btn btn-primary btn-sm" onClick={viewDetailConect}>
-                  🔍 Xem chi tiết
-                </button>
-              </div>
             </div>
 
             </DraggableCard>
@@ -875,6 +969,7 @@ const findNameConectFiberById=(id)=>{
             <Polyline key={i} positions={positions} color={conn.color || 'black'}
              eventHandlers={{
                       click: () => handleConnectionClick(conn), // Hàm xử lý khi click vào đường nối
+                       contextmenu: (e) => handleRightClick(conn, e), 
                     }}
             
             >
