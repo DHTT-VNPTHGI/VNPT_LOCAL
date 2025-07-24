@@ -111,36 +111,20 @@ const findNameConectFiberById=(id)=>{
     return new L.Icon({ iconUrl, iconSize: [size, size * 1.3], iconAnchor: [size / 2, size * 1.3], popupAnchor: [0, -size] });
   };
 
-  // const MapEvents = () => {
-  //   const map = useMapEvent('zoomend', () => setZoom(map.getZoom()));
-  //   useMapEvent('contextmenu', (e) => {
-  //     setMenu({ type: 'add', latlng: e.latlng, screenX: e.originalEvent.clientX, screenY: e.originalEvent.clientY });
-  //   });
-  //   useMapEvent('click', () => {
-  //     setMenu(null);
-  //     setFormState({ visible: false, data: null });
-  //     setConnectionPopup(null);
-  //     setSelectedToIndex(null);
-  //     setConnectionLabel('');
-  //   });
-  //   return null;
-  // };
-const MapEvents = () => {
-  useMapEvent('click', (e) => {
-    if (spliceForm) {
-      // Chỉ cập nhật khi form đang mở
-      setSpliceForm((prev) => ({
-        ...prev,
-        lat: e.latlng.lat,
-        lng: e.latlng.lng,
-      }));
-    } else {
+  const MapEvents = () => {
+    const map = useMapEvent('zoomend', () => setZoom(map.getZoom()));
+    useMapEvent('contextmenu', (e) => {
+      setMenu({ type: 'add', latlng: e.latlng, screenX: e.originalEvent.clientX, screenY: e.originalEvent.clientY });
+    });
+    useMapEvent('click', () => {
       setMenu(null);
       setFormState({ visible: false, data: null });
-    }
-  });
-  return null;
-};
+      setConnectionPopup(null);
+      setSelectedToIndex(null);
+      setConnectionLabel('');
+    });
+    return null;
+  };
 
   useEffect(() => {
     NodeService.getAll().then(res => setMarkers(res.data?Object.values(res.data):[]));
