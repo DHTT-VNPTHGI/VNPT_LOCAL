@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './AddMarkerForm.css';
 import * as XLSX from 'xlsx';
+import { type } from '@testing-library/user-event/dist/type';
 const MarkerForm = ({ initialData, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState(
     initialData || { name: '', type: '', latlng: null }
@@ -64,13 +65,13 @@ const handleImportExcel = (e) => {
 
         if (
           row.name &&
-          row.type &&
+         
           !isNaN(lat) &&
           !isNaN(lng)
         ) {
           return {
             name: row.name,
-            type: row.type,
+            type: "UPE",
             latlng: [lat, lng],
           };
         } else {
@@ -97,8 +98,9 @@ const handleImportExcel = (e) => {
 
 
    console.log(validMarkers)
-   validMarkers.map((item,index)=>{
-    onSubmit(item)
+   validMarkers.map(async(item,index)=>{
+    console.log(item)
+    await onSubmit(item)
    })
   };
 
@@ -132,12 +134,12 @@ const handleImportExcel = (e) => {
         placeholder="Nhập tên trạm"
         value={formData.name}
         onChange={(e) =>
-          setFormData((prev) => ({ ...prev, name: e.target.value }))
+          setFormData((prev) => ({ ...prev, name: e.target.value,type:"UPE" }))
         }
       />
     </div>
 
-    <div className="mb-3">
+    {/* <div className="mb-3">
       <label className="form-label">Loại trạm:</label>
       <select
         className="form-select"
@@ -152,8 +154,8 @@ const handleImportExcel = (e) => {
         <option value="Small Cell">Small Cell</option>
         <option value="Cell Remote">Cell Remote</option>
         {/* <option value="Mang xong">Măng Xông</option> */}
-      </select>
-    </div>
+      {/* </select>
+    </div> */}
 
     <div className="d-flex justify-content-end gap-2">
               <input

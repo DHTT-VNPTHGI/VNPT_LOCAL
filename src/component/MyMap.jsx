@@ -17,7 +17,7 @@ import ConnectService from '../service/ConnectService';
 import { toast, ToastContainer } from 'react-toastify';
 import FiberDetailService from '../service/FiberDetailService';
 import FiberService from '../service/FiberService';
-
+import * as XLSX from 'xlsx';
 const MyMap = () => {
   const center = [9.783, 105.467];
   const [markers, setMarkers] = useState([]);
@@ -42,6 +42,9 @@ const MyMap = () => {
 const [showDisconnectButton, setShowDisconnectButton] = useState(false);
 const [flag, setflag] = useState(false);
 const [spliceForm, setSpliceForm] = useState(null);
+const getRandomColor = () => '#' + Math.floor(Math.random() * 16777215).toString(16);
+
+
 
     const handleOpenModal = (e,marker) => {
       console.log(marker)
@@ -366,11 +369,19 @@ const findNameConectFiberById=(id)=>{
         newData.id = id;
 
         // Kiểm tra trùng latlng
-        const isDuplicate = markers.some(
-          (m) => m.latlng[0] === newData.latlng[0] && m.latlng[1] === newData.latlng[1]
-        );
+        let isDuplicate = -1
+        let list=[...markers]
+        console.log(
+          markers.filter(
+          (m) => m.latlng.lat == newData.latlng.lat && m.latlng.lng == newData.latlng.lng && m.name==newData.name
+          )
+        )
+        isDuplicate= markers.filter(
+          (m) => m.latlng.lat == newData.latlng.lat && m.latlng.lng == newData.latlng.lng && m.name==newData.name
+          )
+        // console.log(markers,isDuplicate,newData)
 
-        if (isDuplicate) {
+        if (isDuplicate.length>0) {
           toast.error("⚠️  trạm "+newData.name+" đã tồn tại tại vị trí này!");
           return;
         }
@@ -385,19 +396,20 @@ const findNameConectFiberById=(id)=>{
     setFormState({ visible: false, data: null });
   };
 
-  const getArcCoordinates = (from, to, offsetIndex = 0) => {
-    const offsetMultiplier = 0.0018;
-    const latlng1 = L.latLng(from);
-    const latlng2 = L.latLng(to);
-    const midpoint = [(latlng1.lat + latlng2.lat) / 2, (latlng1.lng + latlng2.lng) / 2];
-    const dx = latlng2.lng - latlng1.lng;
-    const dy = latlng2.lat - latlng1.lat;
-    const norm = Math.sqrt(dx * dx + dy * dy);
-    const offsetX = -dy / norm * offsetIndex * offsetMultiplier;
-    const offsetY = dx / norm * offsetIndex * offsetMultiplier;
-    const controlPoint = [midpoint[0] + offsetY, midpoint[1] + offsetX];
-    return [from, controlPoint, to];
-  };
+const getArcCoordinates = (from, to, offsetIndex = 0) => {
+  const offsetMultiplier = 0.0048;
+  const latlng1 = L.latLng(from);
+  const latlng2 = L.latLng(to);
+  const midpoint = [(latlng1.lat + latlng2.lat) / 2, (latlng1.lng + latlng2.lng) / 2];
+  const dx = latlng2.lng - latlng1.lng;
+  const dy = latlng2.lat - latlng1.lat;
+  const norm = Math.sqrt(dx * dx + dy * dy);
+  const offsetX = -dy / norm * offsetIndex * offsetMultiplier;
+  const offsetY = dx / norm * offsetIndex * offsetMultiplier;
+  const controlPoint = [midpoint[0] + offsetY, midpoint[1] + offsetX];
+  return [from, controlPoint, to];
+};
+
   const DeleteConnect =()=>{
     console.log(DetailConnections,selectedPort)
   let listcableCount=DetailConnections
@@ -534,7 +546,9 @@ const handleSaveSplicePoint = () => {
         id: randomId("splice_"),
         name: spliceForm.name || `Mối hàn ${conn.splicePoints?.length + 1 || 1}`,
         latlng: [spliceForm.lat, spliceForm.lng],
-        order: (conn.splicePoints?.length || 0) + 1
+        order: (conn.splicePoints?.length || 0) + 1,
+        km:spliceForm.km,
+        nodename:spliceForm.nodename
       };
 
       const updatedConn = {
@@ -550,9 +564,77 @@ const handleSaveSplicePoint = () => {
 
   setConnections(updatedConnections);
   setSpliceForm(null);
-  toast.success("✅ Đã thêm mối hàn");
+  toast.success(" Đã thêm mối hàn");
 };
 
+
+
+const handleImportExcel = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = (evt) => {
+    const data = new Uint8Array(evt.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+
+    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+    const newConnections = [];
+
+    rows.forEach((row, index) => {
+      const fromName = row.from_node?.toString().trim();
+      const toName = row.to_node?.toString().trim();
+      const label = row.label?.toString().trim() || `Tuyến ${index + 1}`;
+      const cableType = row.cableType?.toString().trim() || "24FO";
+
+      const fromNode = markers.find(m => m.name?.trim() === fromName);
+      const toNode = markers.find(m => m.name?.trim() === toName);
+
+      if (!fromNode || !toNode) {
+        toast.warning(`⚠️ Không tìm thấy node "${fromName}" hoặc "${toName}" ở dòng ${index + 2}`);
+        return;
+      }
+
+      const conn = {
+        id: randomId("connect_"),
+        from: fromNode.id,
+        to: toNode.id,
+        label,
+        cableType,
+          offsetIndex:
+        connections.filter(
+          (c) =>
+            (c.from === fromNode.id && c.to === toNode.id) ||
+            (c.from === toNode.id && c.to === fromNode.id)
+        ).length,
+
+        color: getRandomColor(),
+        splicePoints: []
+      };
+
+      newConnections.push(conn);
+    });
+
+    // Gửi lên server & cập nhật UI
+    newConnections.forEach(conn => {
+      ConnectService.update(conn);
+    });
+
+    setConnections(prev => [...prev, ...newConnections]);
+    toast.success(`📡 Đã import ${newConnections.length} kết nối từ Excel thành công!`);
+  };
+
+  reader.onerror = () => {
+    toast.error("❌ Lỗi khi đọc file Excel.");
+  };
+  setConnectionPopup(null)
+  reader.readAsArrayBuffer(file);
+};
 
 
   return (
@@ -600,7 +682,7 @@ const handleSaveSplicePoint = () => {
           left={connectionPopup.screenX}
           title={`🔗 Kết nối từ: ${markers.find(m => m.id === connectionPopup.fromId)?.name || 'Marker'}`}
           onClose={() => setConnectionPopup(null)}
-          width={300}
+          width={500}
         >
           <div className="mb-2">
             <label className="form-label">Tên kết nối</label>
@@ -648,6 +730,27 @@ const handleSaveSplicePoint = () => {
           </div>
 
           <div className="d-flex justify-content-end gap-2">
+           
+
+
+
+
+                         <input
+                          type="file"
+                          accept=".xlsx, .xls"
+                          style={{ display: 'none' }}
+                          id="excelInput"
+                          onChange={handleImportExcel}
+                        />
+                        <button
+                          className="btn btn-outline-primary"
+                          onClick={() => document.getElementById('excelInput').click()}
+                        >
+                          📥Import từ excel
+                        </button>
+                
+
+
             <button className="btn btn-outline-secondary btn-sm" onClick={() => setConnectionPopup(null)}>
               ❌ Huỷ
             </button>
@@ -1022,6 +1125,18 @@ const handleSaveSplicePoint = () => {
           }
         />
       </div>
+
+       <div className="mb-2">
+        <label className="form-label">Khoảng cách đến {spliceForm.nodename}</label>
+        <input
+          type="number"
+          className="form-control"
+          value={spliceForm.km}
+          onChange={(e) =>
+            setSpliceForm({ ...spliceForm, km: e.target.value })
+          }
+        />
+      </div>
       <div className="row mb-2">
         <div className="col">
           <label className="form-label">Lat</label>
@@ -1060,7 +1175,7 @@ const handleSaveSplicePoint = () => {
 
 
 
-{connections.map((conn, i) => {
+{connections.map((conn) => {
   const from = markers.find(m => m.id === conn.from)?.latlng;
   const to = markers.find(m => m.id === conn.to)?.latlng;
   if (!from || !to) return null;
@@ -1069,36 +1184,56 @@ const handleSaveSplicePoint = () => {
     .sort((a, b) => a.order - b.order)
     .map(sp => sp.latlng);
 
-  const positions = [from, ...splicePoints, to];
+  const allPoints = [from, ...splicePoints, to];
 
-  return (
-    <Polyline
-      key={conn.id}
-      positions={positions}
-      color={conn.color || 'blue'}
-      weight={5}
-      eventHandlers={{
-        click: () => handleConnectionClick(conn),
-         contextmenu: (e) => {
-    e.originalEvent.preventDefault();
-    setSpliceForm({
-      connectionId: conn.id,
-      lat: e.latlng.lat,
-      lng: e.latlng.lng,
-      screenX: e.originalEvent.clientX,
-      screenY: e.originalEvent.clientY,
-      name: ''
-    });
-  }
-      }}
-    >
-      <Tooltip direction="top">{conn.label || 'Tuyến cáp'}</Tooltip>
-    </Polyline>
-  );
+  return allPoints.slice(0, -1).map((start, index) => {
+    const end = allPoints[index + 1];
+
+    const offsetIndex = conn.offsetIndex ?? 0;
+    const arc = getArcCoordinates(start, end, offsetIndex);
+
+    return (
+      <Polyline
+        key={`${conn.id}_segment_${index}`}
+        positions={arc}
+        color={conn.color || 'blue'}
+        weight={5}
+        opacity={0.9}
+        eventHandlers={{
+          click: () => handleConnectionClick(conn),
+          contextmenu: (e) => {
+            e.originalEvent.preventDefault();
+            
+            console.log(markers.filter(e=>e.id==conn.from)[0].name,conn.from)
+            setSpliceForm({
+              connectionId: conn.id,
+              lat: e.latlng.lat,
+              lng: e.latlng.lng,
+              screenX: e.originalEvent.clientX,
+              screenY: e.originalEvent.clientY,
+              name: '',
+              nodename:markers.filter(e=>e.id==conn.from)[0].name,
+              km:''
+            });
+          }
+        }}
+      >
+        {index === 0 && (
+          <Tooltip direction="top" sticky>
+            {conn.label || 'Tuyến cáp'}
+          </Tooltip>
+        )}
+      </Polyline>
+    );
+  });
 })}
+
 
 {connections.flatMap(conn =>
   (conn.splicePoints || []).map((sp, index) => (
+  
+   <>
+   {/* {console.log(sp)} */}
     <Marker
       key={sp.id}
       position={sp.latlng}
@@ -1107,8 +1242,9 @@ const handleSaveSplicePoint = () => {
         html: `<div style="background:#f00;width:10px;height:10px;border-radius:50%"></div>`,
       })}
     >
-      <Tooltip direction="top">{`Mối hàn #${index + 1}`}</Tooltip>
+      <Tooltip direction="top">{`${sp.name} ${sp.km}Km đến ${sp.nodename}`}</Tooltip>
     </Marker>
+   </>
   ))
 )}
 

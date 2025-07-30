@@ -1,0 +1,774 @@
+import React, { useEffect, useState } from 'react';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+  useMapEvent,
+  Tooltip,
+} from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import MarkerForm from './MarkerForm';
+import L from 'leaflet';
+import NodeService from '../service/NodeService';
+import DraggableCard from './DraggableCard';
+import ConnectService from '../service/ConnectService';
+import { toast, ToastContainer } from 'react-toastify';
+import FiberDetailService from '../service/FiberDetailService';
+import FiberService from '../service/FiberService';
+import * as XLSX from 'xlsx'; // Import thư viện xlsx
+import 'bootstrap/dist/css/bootstrap.min.css'; // Cần cho giao diện menu
+import 'bootstrap/dist/js/bootstrap.bundle.min.js'; // Cần cho menu dropdown hoạt động
+const MyMap = () => {
+  const center = [9.783, 105.467];
+  const [markers, setMarkers] = useState([]);
+  const [listFiber, setListFiber] = useState([]);
+  const [connections, setConnections] = useState([]);
+  const [connectionolds, setConnectionolds] = useState([]);
+  const [DetailConnections, setDetailConnections] = useState([]);
+  const [formState, setFormState] = useState({ visible: false, data: null });
+  const [menu, setMenu] = useState(null);
+  const [connectionPopup, setConnectionPopup] = useState(null);
+  const [fiberPopup, setFiberPopup] = useState(null);
+  const [selectedToIndex, setSelectedToIndex] = useState(null);
+  const [connectionLabel, setConnectionLabel] = useState('');
+  const [connectionType, setConnectionType] = useState('');
+  const [zoom, setZoom] = useState(10);
+  const [indexfiber, SetIndexFiber] = useState(0);
+  const [expandedIndex, setExpandedIndex] = useState(null);
+  const [selectedMarker, setSelectedMarker] = useState(null);
+  const [selectedConnection, setSelectedConnection] = useState(null);
+  const [PortSelected, setPortSelected] = useState({});
+  const [selectedPort, setSelectedPort] = useState(null);
+  const [showDisconnectButton, setShowDisconnectButton] = useState(false);
+  const [flag, setflag] = useState(false);
+  const [spliceForm, setSpliceForm] = useState(null);
+  const handleDownloadSample = () => {
+    const sampleData = [{
+      from_node: 'Tên Trạm Bắt Đầu',
+      to_node: 'Tên Trạm Kết Thúc',
+      label: 'Tên Tuyến Cáp Mẫu',
+      cableType: '24'
+    }];
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "FileMau");
+    XLSX.writeFile(wb, "file_mau_tuyen_cap.xlsx");
+  };
+  const handleOpenModal = (e, marker) => {
+    e.originalEvent.preventDefault();
+    setSelectedMarker({ marker: marker, screenX: e.originalEvent.clientX, screenY: e.originalEvent.clientY });
+  };
+
+  const handleCloseModal = () => {
+    setSelectedMarker(null);
+  };
+
+  const HandelSelectPort = (item, index) => {
+    findNameConectFiberById(item.id_fiber);
+    setSelectedPort({
+      item: item,
+      portNumber: index,
+    });
+  };
+
+  const toggleExpand = (index) => {
+    setExpandedIndex(prev => (prev === index ? null : index));
+  };
+
+  const handleConnectionClick = (connection) => {
+    FiberDetailService.getAll().then(
+      res => {
+        let listFilter = res.data ? Object.values(res.data).filter(e => e.id_connect == connection.id) : [];
+        const cableCount = parseInt(connection.cableType);
+        const listcableCount = Array.from({ length: cableCount }, (_, i) => ({
+          id: i + 1,
+          port: i + 1,
+          status: 0
+        }));
+
+        listFilter.forEach(item => {
+          let i = listcableCount.findIndex(e => e.port == item.cableCount);
+          if (i !== -1) {
+            listcableCount[i].status = 1;
+            listcableCount[i].id_fiber = item.id_fiber;
+          }
+        });
+        setDetailConnections(listcableCount);
+      }
+    );
+    setSelectedConnection(connection);
+  };
+
+  const findNameConectFiberById = (id) => {
+    FiberService.getAll().then(
+      res => {
+        const foundFiber = Object.values(res.data).find(e => e.id == id);
+        if (foundFiber) {
+          setPortSelected(foundFiber);
+        }
+      }
+    );
+  };
+
+  const getCustomIcon = (type, zoomLevel = 10) => {
+    const baseSize = 30;
+    const scale = Math.max(zoomLevel / 13, 0.5);
+    const size = baseSize * scale;
+    let iconUrl = 'https://cdn-icons-png.flaticon.com/512/684/684908.png';
+    if (type === 'UPE') iconUrl = 'https://cdn-icons-png.flaticon.com/512/854/854878.png';
+    else if (type === 'Small Cell') iconUrl = 'https://cdn-icons-png.flaticon.com/512/3103/3103446.png';
+    else if (type === 'Cell Remote') iconUrl = 'https://cdn-icons-png.flaticon.com/512/850/850960.png';
+    return new L.Icon({ iconUrl, iconSize: [size, size * 1.3], iconAnchor: [size / 2, size * 1.3], popupAnchor: [0, -size] });
+  };
+
+  const MapEvents = () => {
+    const map = useMapEvent('zoomend', () => setZoom(map.getZoom()));
+    useMapEvent('contextmenu', (e) => {
+      setMenu({ type: 'add', latlng: e.latlng, screenX: e.originalEvent.clientX, screenY: e.originalEvent.clientY });
+    });
+    useMapEvent('click', () => {
+      setMenu(null);
+      setFormState({ visible: false, data: null });
+      setConnectionPopup(null);
+      setSelectedToIndex(null);
+      setConnectionLabel('');
+    });
+    return null;
+  };
+
+  useEffect(() => {
+    NodeService.getAll().then(res => setMarkers(res.data ? Object.values(res.data) : []));
+    ConnectService.getAll().then(res => {
+      const connectionsWithSplice = Object.values(res.data || {}).map(conn => ({
+        ...conn,
+        splicePoints: conn.splicePoints || []
+      }));
+      setConnections(connectionsWithSplice);
+      setConnectionolds(connectionsWithSplice);
+    });
+  }, [flag]);
+
+  const handleMarkerRightClick = (e, markerId) => {
+    e.originalEvent.preventDefault();
+    setMenu({ type: 'marker', markerId, screenX: e.originalEvent.clientX, screenY: e.originalEvent.clientY });
+  };
+
+  const handleAdd = () => {
+    setFormState({ visible: true, data: { name: '', type: '', latlng: menu.latlng } });
+    setMenu(null);
+  };
+
+  const handleEdit = () => {
+    const marker = markers.find(m => m.id === menu.markerId);
+    const editingIndex = markers.findIndex(m => m.id === menu.markerId);
+    setFormState({ visible: true, data: { ...marker, editingIndex } });
+    setMenu(null);
+  };
+
+  const handleDelete = () => {
+    const markerToDelete = markers.find(m => m.id === menu.markerId);
+    if (!markerToDelete) return;
+
+    const isConnected = connections.some(c => c.from === menu.markerId || c.to === menu.markerId);
+    if (isConnected) {
+      toast.error("Không thể xóa trạm khi đang có tuyến cáp kết nối!");
+      return;
+    }
+
+    NodeService.delete(markerToDelete).then(() => {
+      toast.success("Xóa Node thành công!");
+      setMarkers(prev => prev.filter(m => m.id !== menu.markerId));
+    }).catch(err => {
+      toast.error("Có lỗi xảy ra khi xóa Node.");
+    });
+    setMenu(null);
+  };
+
+  const handleStartConnect = () => {
+    setConnectionPopup({ fromId: menu.markerId, screenX: menu.screenX, screenY: menu.screenY });
+    setMenu(null);
+  };
+
+  const handleStartFiber = () => {
+    const list = [];
+    SetIndexFiber(0);
+    const newItem = {
+      id: randomId("fiberdetail_"),
+      current: menu.markerId,
+      neighbor: "",
+      selectConnect: "",
+      listConect: connections.filter(e => e.to === menu.markerId || e.from === menu.markerId),
+      listcableCount: [],
+      cableCount: ""
+    };
+    list.push(newItem);
+    setListFiber(list);
+    setFiberPopup({ fromId: menu.markerId, screenX: menu.screenX, screenY: menu.screenY });
+    setMenu(null);
+  };
+
+  const handleConfirmConnection = () => {
+    if (selectedToIndex === null || selectedToIndex === connectionPopup.fromId) {
+      toast.warn("Vui lòng chọn điểm đến hợp lệ.");
+      return;
+    }
+    const color = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+    const newConect = {
+      id: randomId("conect_"),
+      from: connectionPopup.fromId,
+      to: selectedToIndex,
+      label: connectionLabel,
+      color,
+      cableType: connectionType
+    };
+    ConnectService.update(newConect).then(() => {
+      toast.success("Thêm tuyến cáp thành công");
+      setConnections(prev => [...prev, newConect]);
+    });
+    setConnectionPopup(null);
+    setSelectedToIndex(null);
+    setConnectionLabel('');
+    setConnectionType('');
+  };
+
+  const handleConfirmFiber = () => {
+    const isValid = listFiber.every(item => item.portStart && item.portEnd && item.cableCount && item.selectConnect);
+    if (!isValid) {
+      toast.info("Vui lòng nhập đầy đủ thông tin cho mỗi sợi quang.");
+      return;
+    }
+
+    const id_fiber = randomId("fiber_");
+    listFiber.forEach(item => {
+      let newItem = { id: item.id, id_fiber: id_fiber, cableCount: item.cableCount, portEnd: item.portEnd, portStart: item.portStart, id_connect: item.selectConnect };
+      FiberDetailService.update(newItem);
+    });
+
+    let node_end = listFiber.length > 0 ? listFiber[listFiber.length - 1].neighbor : '';
+    if (listFiber.length === 1) {
+      node_end = listFiber[0].neighbor;
+    }
+
+    const startNodeName = markers.find(m => m.id === listFiber[0].current)?.name || '';
+    const endNodeName = markers.find(m => m.id === node_end)?.name || '';
+
+    let fibernew = {
+      id: id_fiber,
+      node_start: listFiber[0].current,
+      node_end: node_end,
+      name: `${startNodeName}-${endNodeName}`
+    };
+
+    FiberService.update(fibernew).then(() => {
+      toast.success("Thêm đường quang thành công");
+      setFiberPopup(null); // Đóng popup sau khi lưu
+    });
+  };
+  
+  const changeSelectConect = (e, i) => {
+    const newList = [...listFiber];
+    const selectedConnectId = e.target.value;
+    const connection = connections.find(item => item.id === selectedConnectId);
+    if (!connection) return;
+
+    const cableCount = parseInt(connection.cableType);
+    const listcableCount = Array.from({ length: cableCount }, (_, i) => ({
+      id: i + 1,
+      value: i + 1,
+    }));
+    
+    newList[i].selectConnect = selectedConnectId;
+    newList[i].listcableCount = listcableCount;
+    newList[i].neighbor = connection.to === newList[i].current ? connection.from : connection.to;
+    setListFiber(newList);
+  };
+  
+  const changeSelectCableCount = (e, i) => {
+    const newList = [...listFiber];
+    const value = e.target.value;
+    newList[i].cableCount = value;
+    newList[i].portEnd = value;
+    newList[i].portStart = value;
+    setListFiber(newList);
+  };
+
+  const changePortStart = (e, i) => {
+    const newList = [...listFiber];
+    newList[i].portStart = e.target.value;
+    setListFiber(newList);
+  };
+
+  const changePortEnd = (e, i) => {
+    const newList = [...listFiber];
+    newList[i].portEnd = e.target.value;
+    setListFiber(newList);
+  };
+
+  const handleCreateConectFiber = () => {
+    const lastFiber = listFiber[indexfiber];
+    if (!lastFiber || !lastFiber.neighbor) {
+        toast.warn("Vui lòng chọn kết nối cho sợi quang hiện tại trước khi thêm mới.");
+        return;
+    }
+    const newCurrent = lastFiber.neighbor;
+    const lastNeighbor = lastFiber.current;
+    
+    const newItem = {
+      id: randomId("fiberdetail_"),
+      current: newCurrent,
+      neighbor: "",
+      selectConnect: "",
+      listConect: connections.filter(e => (e.to === newCurrent || e.from === newCurrent) && (e.to !== lastNeighbor && e.from !== lastNeighbor)),
+      listcableCount: [],
+      cableCount: ""
+    };
+    
+    setListFiber(prev => [...prev, newItem]);
+    SetIndexFiber(prev => prev + 1);
+  };
+
+  const handleBackConectFiber = () => {
+    if (listFiber.length > 1) {
+      const newList = listFiber.slice(0, -1);
+      setListFiber(newList);
+      SetIndexFiber(prev => prev - 1);
+    }
+  };
+
+  const randomId = (prefix = '') => prefix + Math.random().toString(36).substr(2, 9);
+
+  const handleSubmitForm = (newData) => {
+    if (newData.editingIndex != null) {
+      const updated = [...markers];
+      updated[newData.editingIndex] = newData;
+      NodeService.update(updated[newData.editingIndex]).then(() => {
+        toast.success("Cập nhật thông tin trạm thành công");
+        setMarkers(updated);
+      });
+    } else {
+      const isDuplicate = markers.some(m => m.latlng.lat === newData.latlng.lat && m.latlng.lng === newData.latlng.lng && m.name === newData.name);
+      if (isDuplicate) {
+        toast.error(`Trạm "${newData.name}" đã tồn tại tại vị trí này!`);
+        return;
+      }
+      const newMarker = { ...newData, id: randomId('node_') };
+      NodeService.update(newMarker).then(() => {
+        toast.success(`Thêm trạm "${newMarker.name}" thành công`);
+        setMarkers(prev => [...prev, newMarker]);
+      });
+    }
+    setFormState({ visible: false, data: null });
+  };
+
+  const DeleteConnect = () => {
+    const fiberIdToDelete = PortSelected.id;
+    FiberDetailService.getAll().then(res => {
+        const detailsToDelete = Object.values(res.data).filter(e => e.id_fiber === fiberIdToDelete);
+        const deletePromises = detailsToDelete.map(item => FiberDetailService.delete(item));
+        
+        Promise.all(deletePromises).then(() => {
+            FiberService.delete({ id: fiberIdToDelete }).then(() => {
+                toast.success("Xóa kết nối quang thành công");
+                const updatedDetails = DetailConnections.map(port => {
+                    if (port.id_fiber === fiberIdToDelete) {
+                        return { ...port, status: 0, id_fiber: undefined };
+                    }
+                    return port;
+                });
+                setDetailConnections(updatedDetails);
+            });
+        });
+    });
+    setSelectedPort(null);
+  };
+  
+  const viewDetailConect = () => {
+    setShowDisconnectButton(true);
+    const fiberId = PortSelected.id;
+
+    FiberDetailService.getAll().then(resDetails => {
+        const relevantDetails = Object.values(resDetails.data).filter(e => e.id_fiber === fiberId);
+        const connectionIds = relevantDetails.map(d => d.id_connect);
+        
+        const filteredConnections = connections.filter(c => connectionIds.includes(c.id));
+        
+        const nodeIds = new Set();
+        filteredConnections.forEach(c => {
+            nodeIds.add(c.from);
+            nodeIds.add(c.to);
+        });
+
+        const filteredMarkers = markers.filter(m => nodeIds.has(m.id));
+
+        setConnections(filteredConnections);
+        setMarkers(filteredMarkers);
+    });
+    
+    setSelectedPort(null);
+    setSelectedConnection(null);
+  };
+
+  const handleDisconnect = () => {
+    setflag(prev => !prev);
+    setShowDisconnectButton(false);
+  };
+
+  const DeleteTuyenCap = () => {
+    if (!selectedConnection) return;
+    
+    FiberDetailService.getAll().then(res => {
+      const isUsed = res.data ? Object.values(res.data).some(e => e.id_connect === selectedConnection.id) : false;
+      if (isUsed) {
+        toast.error("Không thể xóa tuyến cáp do đang có kết nối quang sử dụng!");
+      } else {
+        ConnectService.delete(selectedConnection).then(() => {
+          toast.success("Xóa tuyến cáp thành công!");
+          setConnections(prev => prev.filter(e => e.id !== selectedConnection.id));
+          setSelectedConnection(null);
+        });
+      }
+    });
+  };
+
+  const handleSaveSplicePoint = () => {
+    if (!spliceForm) return;
+    const updatedConnections = connections.map(conn => {
+      if (conn.id === spliceForm.connectionId) {
+        const newSplice = {
+          id: randomId("splice_"),
+          name: spliceForm.name || `Mối hàn ${conn.splicePoints?.length + 1 || 1}`,
+          latlng: [spliceForm.lat, spliceForm.lng],
+          order: (conn.splicePoints?.length || 0) + 1
+        };
+        const updatedConn = { ...conn, splicePoints: [...(conn.splicePoints || []), newSplice] };
+        ConnectService.update(updatedConn);
+        return updatedConn;
+      }
+      return conn;
+    });
+    setConnections(updatedConnections);
+    setSpliceForm(null);
+    toast.success("Đã thêm mối hàn");
+  };
+
+  // --- Chức năng Import Excel ---
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        processExcelData(data);
+      } catch (error) {
+        toast.error("Tệp Excel không hợp lệ hoặc có lỗi khi đọc.");
+        console.error("Excel read error:", error);
+      }
+    };
+    reader.onerror = () => {
+        toast.error("Không thể đọc tệp.");
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = ''; // Reset input để có thể chọn lại cùng tệp
+  };
+
+  const processExcelData = (excelData) => {
+    const newConnections = [];
+    const markersByName = markers.reduce((acc, marker) => {
+      acc[marker.name.trim()] = marker.id;
+      return acc;
+    }, {});
+
+    excelData.forEach((row, index) => {
+      // Yêu cầu các cột phải tồn tại
+      if (!row.from_node || !row.to_node || !row.label || !row.cableType) {
+        toast.warn(`Dòng ${index + 2}: Thiếu thông tin cần thiết.`);
+        return; // Bỏ qua hàng này
+      }
+
+      const fromId = markersByName[row.from_node.trim()];
+      const toId = markersByName[row.to_node.trim()];
+
+      if (fromId && toId) {
+        const newConn = {
+          id: randomId("conn_excel_"),
+          from: fromId,
+          to: toId,
+          label: row.label,
+          cableType: String(row.cableType),
+          color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'),
+          splicePoints: [],
+        };
+        newConnections.push(newConn);
+      } else {
+        if (!fromId) toast.warn(`Dòng ${index + 2}: Không tìm thấy node "${row.from_node}"`);
+        if (!toId) toast.warn(`Dòng ${index + 2}: Không tìm thấy node "${row.to_node}"`);
+      }
+    });
+
+    if (newConnections.length > 0) {
+      setConnections(prev => [...prev, ...newConnections]);
+      const updatePromises = newConnections.map(conn => ConnectService.update(conn));
+      Promise.all(updatePromises).then(() => {
+        toast.success(`✅ Import thành công ${newConnections.length} tuyến cáp!`);
+      }).catch(() => {
+        toast.error("Có lỗi khi lưu một số tuyến cáp lên server.");
+      });
+    } else {
+        toast.info("Không có tuyến cáp mới nào được thêm.");
+    }
+  };
+  // --- Kết thúc chức năng Import Excel ---
+
+
+  return (
+    <div>
+      {menu && (
+        <div style={{ position: 'absolute', top: menu.screenY, left: menu.screenX, background: 'white', border: '1px solid #ccc', padding: '6px', zIndex: 1000 }}>
+          {menu.type === 'add' && <button className="btn btn-sm btn-light w-100 text-start" onClick={handleAdd}>➕ Thêm Marker</button>}
+          {menu.type === 'marker' && (
+            <>
+              <button className="btn btn-sm btn-light w-100 text-start" onClick={handleEdit}>✏️ Sửa</button>
+              <button className="btn btn-sm btn-light w-100 text-start mt-1" onClick={handleDelete}>🗑️ Xoá</button>
+              <button className="btn btn-sm btn-light w-100 text-start mt-1" onClick={handleStartConnect}>🔗 Thêm tuyến cáp</button>
+              <button className="btn btn-sm btn-light w-100 text-start mt-1" onClick={handleStartFiber}>➕ Thêm kết nối quang</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {formState.visible && (
+        <MarkerForm
+          initialData={formState.data}
+          onCancel={() => setFormState({ visible: false, data: null })}
+          onSubmit={handleSubmitForm}
+        />
+      )}
+      
+      {/* Nút Import Excel */}
+
+     
+ <div className="dropdown" style={{ position: 'absolute', top: 10, left: 80, zIndex: 401 }}>
+        <button className="btn btn-primary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          ⚙️ Tùy chọn Import
+        </button>
+        <ul className="dropdown-menu">
+          <li>
+            <label htmlFor="excel-upload" className="dropdown-item" style={{ cursor: 'pointer' }}>📥 Import Tuyến Cáp</label>
+            <input type="file" id="excel-upload" style={{ display: 'none' }} accept=".xlsx, .xls" onChange={handleFileUpload} />
+          </li>
+          <li><hr className="dropdown-divider" /></li>
+          <li><button className="dropdown-item" type="button" onClick={handleDownloadSample}>📄 Tải file mẫu</button></li>
+        </ul>
+      </div>
+
+
+      {connectionPopup && (
+        <DraggableCard title={`🔗 Kết nối từ: ${markers.find(m => m.id === connectionPopup.fromId)?.name}`} onClose={() => setConnectionPopup(null)} width={300} top={connectionPopup.screenY} left={connectionPopup.screenX}>
+          <div className="mb-2">
+            <label className="form-label">Tên kết nối</label>
+            <input type="text" className="form-control" value={connectionLabel} onChange={(e) => setConnectionLabel(e.target.value)} placeholder="Nhập tên" />
+          </div>
+          <div className="mb-2">
+            <label className="form-label">Loại tuyến cáp</label>
+            <select className="form-select" value={connectionType} onChange={(e) => setConnectionType(e.target.value)}>
+              <option value="">-- Chọn loại --</option>
+              <option value="12">12FO</option>
+              <option value="24">24FO</option>
+              <option value="48">48FO</option>
+              <option value="96">96FO</option>
+              <option value="144">144FO</option>
+            </select>
+          </div>
+          <div className="mb-3">
+            <label className="form-label">Chọn điểm đến</label>
+            <select className="form-select" value={selectedToIndex ?? ''} onChange={(e) => setSelectedToIndex(e.target.value)}>
+              <option value="" disabled>-- Chọn marker --</option>
+              {markers.map((m) =>
+                m.id !== connectionPopup.fromId && (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                )
+              )}
+            </select>
+          </div>
+          <div className="d-flex justify-content-end gap-2">
+            <button className="btn btn-outline-secondary btn-sm" onClick={() => setConnectionPopup(null)}>❌ Huỷ</button>
+            <button className="btn btn-success btn-sm" onClick={handleConfirmConnection}>✅ Tạo</button>
+          </div>
+        </DraggableCard>
+      )}
+
+      {fiberPopup && (
+        <DraggableCard title={`🔗 Kết nối quang từ: ${markers.find(m => m.id === fiberPopup.fromId)?.name}`} onClose={() => setFiberPopup(null)} width={900} top={fiberPopup.screenY} left={fiberPopup.screenX}>
+          {listFiber && listFiber.map((item, index) => (
+            <div key={item.id} className="border p-3 mb-3 rounded shadow-sm">
+              <div className="d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">Sợi quang #{index + 1}</h5>
+                <button className="btn btn-sm btn-outline-primary" onClick={() => toggleExpand(index)}>
+                  {expandedIndex === index ? 'Thu gọn ▲' : 'Chi tiết ▼'}
+                </button>
+              </div>
+              {expandedIndex === index && (
+                <div className="mt-3">
+                  <div className="mb-2">
+                    <label className="form-label">Trạm Bắt đầu</label>
+                    <input type="text" className="form-control" readOnly value={markers.find(m => m.id === item.current)?.name || ''} />
+                  </div>
+                  <div className="row">
+                    <div className="col-lg-4"><label className="form-label">Điểm bắt đầu</label><input type="text" className="form-control" value={item.portStart} onChange={(e) => changePortStart(e, index)} placeholder="Port ODF" /></div>
+                    <div className="col-lg-8"><label className="form-label">Chọn đường kết nối</label>
+                      <select className="form-select" value={item.selectConnect} onChange={(e) => changeSelectConect(e, index)}>
+                        <option value="" disabled>-- Chọn kết nối --</option>
+                        {item.listConect.map((m, i) => (<option key={m.id} value={m.id}>{m.label || 'Tuyến cáp ' + m.id}</option>))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="row mt-2">
+                    <div className="col-lg-4"><label className="form-label">Trạm kết thúc</label><input type="text" className="form-control" readOnly value={markers.find(m => m.id === item.neighbor)?.name || ''} /></div>
+                    <div className="col-lg-4"><label className="form-label">Chọn Sợi Quang</label>
+                      <select className="form-select" value={item.cableCount} onChange={(e) => changeSelectCableCount(e, index)}>
+                        <option value="" disabled>-- Chọn sợi quang --</option>
+                        {item.listcableCount.map((m) => (<option key={m.id} value={m.value}>{m.value}</option>))}
+                      </select>
+                    </div>
+                    <div className="col-lg-4"><label className="form-label">Điểm kết thúc</label><input type="text" className="form-control" value={item.portEnd} onChange={(e) => changePortEnd(e, index)} placeholder="Port ODF" /></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          <div className="d-flex justify-content-end gap-2 mt-3">
+            <button className="btn btn-outline-secondary btn-sm" onClick={() => setFiberPopup(null)}>❌ Huỷ</button>
+            {listFiber.length > 1 && <button className="btn btn-warning btn-sm" onClick={handleBackConectFiber}>Trở lại</button>}
+            <button className="btn btn-primary btn-sm" onClick={handleCreateConectFiber}>Thêm chặng</button>
+            <button className="btn btn-success btn-sm" onClick={handleConfirmFiber}>✅ Lưu</button>
+          </div>
+        </DraggableCard>
+      )}
+
+      {selectedConnection && (
+        <DraggableCard title={`Chi tiết tuyến cáp: ${selectedConnection.label || 'Không tên'}`} onClose={() => setSelectedConnection(null)} width={700}>
+          <div className="p-2">
+            {/* Table and port details */}
+            <div className="text-end mb-2">
+                <button className="btn btn-danger btn-sm" onClick={DeleteTuyenCap}>🗑️ Xóa tuyến cáp</button>
+            </div>
+            <div className="d-flex flex-wrap gap-2 p-2 border rounded">
+                {DetailConnections.map((item, index) => (
+                    <div key={index} className="border rounded text-center d-flex align-items-center justify-content-center"
+                        style={{ cursor: item.status === 1 ? 'pointer' : 'default', width: '50px', height: '50px', backgroundColor: item.status === 1 ? '#28a745' : '#dee2e6', color: item.status === 1 ? 'white' : 'black' }}
+                        onClick={() => { if (item.status === 1) HandelSelectPort(item, index + 1) }}>
+                        {index + 1}
+                    </div>
+                ))}
+            </div>
+          </div>
+        </DraggableCard>
+      )}
+
+      {selectedPort && (
+        <DraggableCard title={`Thông tin Port #${selectedPort.portNumber}`} onClose={() => setSelectedPort(null)} width={500}>
+            <div className="p-3">
+                <p><strong>Tên kết nối quang:</strong> {PortSelected.name || 'Không có'}</p>
+                <div className="text-end">
+                    <button className="btn btn-danger btn-sm me-2" onClick={DeleteConnect}>🗑️ Xóa</button>
+                    <button className="btn btn-primary btn-sm" onClick={viewDetailConect}>🔍 Xem chi tiết</button>
+                </div>
+            </div>
+        </DraggableCard>
+      )}
+
+      {showDisconnectButton && (
+        <button className="btn btn-danger btn-sm position-fixed" style={{ top: '20px', right: '20px', zIndex: 1050 }} onClick={handleDisconnect}>
+          🔌 Tắt chế độ xem chi tiết
+        </button>
+      )}
+
+      <MapContainer center={center} zoom={12} style={{ height: "100vh", width: "100%" }}>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <MapEvents />
+        {markers.map((m) => (
+          <Marker
+            key={m.id}
+            position={m.latlng}
+            icon={getCustomIcon(m.type, zoom)}
+            eventHandlers={{
+              click: (e) => handleOpenModal(e, m),
+              contextmenu: (e) => handleMarkerRightClick(e, m.id)
+            }}
+          >
+            <Tooltip direction="bottom" offset={[0, 20]} permanent>
+              <div style={{ fontWeight: 'bold' }}>{m.name}</div>
+            </Tooltip>
+          </Marker>
+        ))}
+
+        {spliceForm && (
+            <DraggableCard title="➕ Thêm măng xông" onClose={() => setSpliceForm(null)} width={300}>
+                {/* Splice Form content */}
+            </DraggableCard>
+        )}
+
+        {connections.map((conn) => {
+          const from = markers.find(m => m.id === conn.from)?.latlng;
+          const to = markers.find(m => m.id === conn.to)?.latlng;
+          if (!from || !to) return null;
+
+          const splicePoints = (conn.splicePoints || []).sort((a, b) => a.order - b.order).map(sp => sp.latlng);
+          const positions = [from, ...splicePoints, to];
+
+          return (
+            <Polyline
+              key={conn.id}
+              positions={positions}
+              color={conn.color || 'blue'}
+              weight={5}
+              eventHandlers={{
+                click: () => handleConnectionClick(conn),
+                contextmenu: (e) => {
+                  e.originalEvent.preventDefault();
+                  setSpliceForm({
+                    connectionId: conn.id,
+                    lat: e.latlng.lat,
+                    lng: e.latlng.lng,
+                    name: ''
+                  });
+                }
+              }}
+            >
+              <Tooltip direction="top">{conn.label || 'Tuyến cáp'}</Tooltip>
+            </Polyline>
+          );
+        })}
+
+        {connections.flatMap(conn =>
+          (conn.splicePoints || []).map((sp, index) => (
+            <Marker
+              key={sp.id}
+              position={sp.latlng}
+              icon={L.divIcon({
+                className: 'splice-icon',
+                html: `<div style="background:#f00;width:10px;height:10px;border-radius:50%; border: 2px solid white;"></div>`,
+              })}
+            >
+              <Tooltip direction="top">{sp.name || `Mối hàn #${index + 1}`}</Tooltip>
+            </Marker>
+          ))
+        )}
+      </MapContainer>
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} />
+    </div>
+  );
+};
+
+export default MyMap;
