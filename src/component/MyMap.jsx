@@ -30,6 +30,7 @@ const MyMap = () => {
   const [connectionPopup, setConnectionPopup] = useState(null);
   const [fiberPopup, setFiberPopup] = useState(null);
   const [selectedToIndex, setSelectedToIndex] = useState(null);
+   const [ConnectLong, setConnectLong] = useState(null);
   const [connectionLabel, setConnectionLabel] = useState('');
   const [connectionType, setConnectionType] = useState('');
   const [zoom, setZoom] = useState(10);
@@ -238,15 +239,19 @@ const findNameConectFiberById=(id)=>{
   };
 
   const handleConfirmConnection = () => {
-    if (selectedToIndex === null || selectedToIndex === connectionPopup.fromId) return;
+    if (selectedToIndex === null || selectedToIndex === connectionPopup.fromId || !ConnectLong ||!connectionLabel) {
+      toast.error("Vui lòng nhập đủ thông tin")
+      return
+    };
     const color = '#' + Math.floor(Math.random() * 16777215).toString(16);
     const offsetIndex = connections.filter(c => (c.from === connectionPopup.fromId && c.to === selectedToIndex) || (c.from === selectedToIndex && c.to === connectionPopup.fromId)).length;
-    const newConect = { id: randomId("conect_"), from: connectionPopup.fromId, to: selectedToIndex, label: connectionLabel, color, offsetIndex, cableType: connectionType };
+    const newConect = { id: randomId("conect_"), from: connectionPopup.fromId, to: selectedToIndex, label: connectionLabel, color, offsetIndex, cableType: connectionType ,km:ConnectLong};
     ConnectService.update(newConect).then(() => toast.success("Thêm kết nối thành công"));
     setConnections((prev) => [...prev, newConect]);
     setConnectionPopup(null);
     setSelectedToIndex(null);
     setConnectionLabel('');
+    setConnectLong("")
     setConnectionType('');
   };
   const handleConfirmFiber=()=>{
@@ -591,6 +596,7 @@ const handleImportExcel = (e) => {
       const toName = row.to_node?.toString().trim();
       const label = row.label?.toString().trim() || `Tuyến ${index + 1}`;
       const cableType = row.cableType?.toString().trim() || "24FO";
+      const km = row.km?.toString().trim() 
 
       const fromNode = markers.find(m => m.name?.trim() === fromName);
       const toNode = markers.find(m => m.name?.trim() === toName);
@@ -612,6 +618,7 @@ const handleImportExcel = (e) => {
             (c.from === fromNode.id && c.to === toNode.id) ||
             (c.from === toNode.id && c.to === fromNode.id)
         ).length,
+        km:km,
 
         color: getRandomColor(),
         splicePoints: []
@@ -728,6 +735,18 @@ const handleImportExcel = (e) => {
               )}
             </select>
           </div>
+          {selectedToIndex&&(
+     <div className="mb-2">
+        <label className="form-label">Khoảng cách đến {markers.find(m => m.id === selectedToIndex)?.name || 'Marker'}</label>
+        <input
+          type="number"
+          className="form-control"
+          value={ConnectLong}
+         onChange={(e) => setConnectLong(e.target.value)}
+        />
+      </div>
+          )}
+      
 
           <div className="d-flex justify-content-end gap-2">
            
@@ -967,12 +986,13 @@ const handleImportExcel = (e) => {
             <table className="table table-striped table-bordered align-middle text-center shadow-sm rounded">
               <thead className="table-primary">
                 <tr>
-                  <th colSpan="4" className="fs-5 text-uppercase">Thông tin kết nối</th>
+                  <th colSpan="5" className="fs-5 text-uppercase">Thông tin kết nối</th>
                 </tr>
                 <tr className="table-light">
                   <th>Từ</th>
                   <th>Đến</th>
                   <th>Loại cáp</th>
+                   <th>Độ dài cáp</th>
                   <th>Số sợi quang</th>
                 </tr>
               </thead>
@@ -980,7 +1000,8 @@ const handleImportExcel = (e) => {
                 <tr>
                   <td>{markers.find(m => m.id === selectedConnection.from)?.name }</td>
                   <td>{markers.find(m => m.id === selectedConnection.to)?.name }</td>
-                  <td>{selectedConnection.cableType || 'Không xác định'}</td>
+                  <td>{selectedConnection.cableType +"FO"|| 'Không xác định'}</td>
+                   <td>{selectedConnection.km +"Km"|| 'Không xác định'}</td>
                   <td>{parseInt(selectedConnection.cableType)}</td>
                 </tr>
               </tbody>
