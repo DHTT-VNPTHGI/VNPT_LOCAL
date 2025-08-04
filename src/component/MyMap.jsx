@@ -31,6 +31,8 @@ const MyMap = () => {
   const [fiberPopup, setFiberPopup] = useState(null);
   const [selectedToIndex, setSelectedToIndex] = useState(null);
    const [ConnectLong, setConnectLong] = useState(null);
+    const [Ngaynhap, setNgaynhap] = useState(null);
+    const [note, setNote] = useState(null);
   const [connectionLabel, setConnectionLabel] = useState('');
   const [connectionType, setConnectionType] = useState('');
   const [zoom, setZoom] = useState(10);
@@ -245,13 +247,15 @@ const findNameConectFiberById=(id)=>{
     };
     const color = '#' + Math.floor(Math.random() * 16777215).toString(16);
     const offsetIndex = connections.filter(c => (c.from === connectionPopup.fromId && c.to === selectedToIndex) || (c.from === selectedToIndex && c.to === connectionPopup.fromId)).length;
-    const newConect = { id: randomId("conect_"), from: connectionPopup.fromId, to: selectedToIndex, label: connectionLabel, color, offsetIndex, cableType: connectionType ,km:ConnectLong};
+    const newConect = { id: randomId("conect_"), from: connectionPopup.fromId, to: selectedToIndex, label: connectionLabel, color, offsetIndex, cableType: connectionType ,km:ConnectLong,ngaynhap:Ngaynhap,ghichu:note};
     ConnectService.update(newConect).then(() => toast.success("Thêm kết nối thành công"));
     setConnections((prev) => [...prev, newConect]);
     setConnectionPopup(null);
     setSelectedToIndex(null);
     setConnectionLabel('');
     setConnectLong("")
+    setNote("")
+    setNgaynhap("")
     setConnectionType('');
   };
   const handleConfirmFiber=()=>{
@@ -597,6 +601,8 @@ const handleImportExcel = (e) => {
       const label = row.label?.toString().trim() || `Tuyến ${index + 1}`;
       const cableType = row.cableType?.toString().trim() || "24FO";
       const km = row.km?.toString().trim() 
+      const ngaynhap = row.ngaynhap?.toString().trim() 
+      const ghichu = row.ghichu?.toString().trim() 
 
       const fromNode = markers.find(m => m.name?.trim() === fromName);
       const toNode = markers.find(m => m.name?.trim() === toName);
@@ -619,6 +625,8 @@ const handleImportExcel = (e) => {
             (c.from === toNode.id && c.to === fromNode.id)
         ).length,
         km:km,
+        ngaynhap:ngaynhap,
+        ghichu:ghichu,
 
         color: getRandomColor(),
         splicePoints: []
@@ -746,6 +754,24 @@ const handleImportExcel = (e) => {
         />
       </div>
           )}
+           <div className="mb-2">
+        <label className="form-label">Ngày nhập trạm</label>
+        <input
+          type="date"
+          className="form-control"
+          value={Ngaynhap}
+         onChange={(e) => setNgaynhap(e.target.value)}
+        />
+      </div>
+            <div className="mb-2">
+        <label className="form-label">Ghi chú</label>
+        <input
+          type="text"
+          className="form-control"
+          value={note}
+         onChange={(e) => setNote(e.target.value)}
+        />
+      </div>
       
 
           <div className="d-flex justify-content-end gap-2">
