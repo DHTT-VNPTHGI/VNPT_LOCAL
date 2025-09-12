@@ -72,7 +72,7 @@ const handleImportExcel = (e) => {
           return {
             name: row.name,
             type: "UPE",
-            latlng: [lat, lng],
+            latlng: {"lat":lat,"lng" :lng},
           };
         } else {
           console.warn(`⚠️ Dòng ${index + 2} bị bỏ qua do thiếu hoặc sai định dạng.`);
