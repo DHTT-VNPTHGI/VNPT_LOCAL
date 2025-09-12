@@ -420,8 +420,8 @@ const findNameConectFiberById=(id)=>{
           toast.error("⚠️  trạm "+newData.name+" đã tồn tại tại vị trí này!");
           return;
         }
-        console.log(markers.length)
-        newData.name=(markers.length+1)+". "+newData.name
+        // console.log(markers.length)
+        // newData.name=(markers.length+1)+". "+newData.name
         NodeService.update(newData).then((res) => {
           toast.success("✅ Thêm trạm "+newData.name+" thành công");
         });
@@ -714,6 +714,7 @@ const handleImportExcel = (e) => {
       {formState.visible && (
         <MarkerForm
           initialData={formState.data}
+          markers={markers}
           onCancel={() => setFormState({ visible: false, data: null })}
           onSubmit={handleSubmitForm}
         />

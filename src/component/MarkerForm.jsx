@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import './AddMarkerForm.css';
 import * as XLSX from 'xlsx';
 import { type } from '@testing-library/user-event/dist/type';
-const MarkerForm = ({ initialData, onSubmit, onCancel }) => {
+const MarkerForm = ({ initialData,markers, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState(
     initialData || { name: '', type: '', latlng: null }
   );
@@ -35,6 +35,7 @@ const MarkerForm = ({ initialData, onSubmit, onCancel }) => {
 
   const handleSubmit = () => {
     if (formData.name.trim() && formData.type.trim()) {
+      formData.name=(markers.length+1)+". "+formData.name
       onSubmit(formData);
     }
   };
@@ -99,8 +100,11 @@ const handleImportExcel = (e) => {
 
 
    console.log(validMarkers)
+   let stt=markers.length+1
    validMarkers.map(async(item,index)=>{
     console.log(item)
+    item.name=stt+". "+item.name
+    stt=stt+1
     await onSubmit(item)
    })
   };
