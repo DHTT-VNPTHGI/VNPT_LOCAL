@@ -48,6 +48,28 @@ const [spliceForm, setSpliceForm] = useState(null);
 const getRandomColor = () => '#' + Math.floor(Math.random() * 16777215).toString(16);
 
 
+// Hàm chuyển đổi số serial Excel thành Date JS
+function excelDateToJSDate(serial) {
+  const utc_days = Math.floor(serial - 25569);
+  const utc_value = utc_days * 86400; // giây
+  const date_info = new Date(utc_value * 1000);
+
+  return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate());
+}
+
+// Hàm format ngày: vừa nhận số, vừa nhận chuỗi
+function formatExcelDate(value) {
+  if (!value) return "";
+  if (!isNaN(value)) {
+    // Trường hợp là số serial Excel
+    const date = excelDateToJSDate(Number(value));
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`; // DD/MM/YYYY
+  }
+  return value.toString().trim(); // Trường hợp đã là string
+}
 
     const handleOpenModal = (e,marker) => {
       console.log(marker)
@@ -137,10 +159,14 @@ const findNameConectFiberById=(id)=>{
     ConnectService.getAll().then(res => 
       
       {
+     
         const connectionsWithSplice = Object.values(res.data || {}).map(conn => ({
       ...conn,
       splicePoints: conn.splicePoints || [] // fallback nếu không có
     }));
+    console.log(
+      connectionsWithSplice
+    )
       setConnections(res.data?connectionsWithSplice:[])
       setConnectionolds(res.data?connectionsWithSplice:[])
       }
@@ -394,7 +420,8 @@ const findNameConectFiberById=(id)=>{
           toast.error("⚠️  trạm "+newData.name+" đã tồn tại tại vị trí này!");
           return;
         }
-
+        console.log(markers.length)
+        newData.name=(markers.length+1)+". "+newData.name
         NodeService.update(newData).then((res) => {
           toast.success("✅ Thêm trạm "+newData.name+" thành công");
         });
@@ -601,7 +628,7 @@ const handleImportExcel = (e) => {
       const label = row.label?.toString().trim() || `Tuyến ${index + 1}`;
       const cableType = row.cableType?.toString().trim() || "24FO";
       const km = row.km?.toString().trim() 
-      const ngaynhap = row.ngaynhap?.toString().trim() 
+       const ngaynhap = formatExcelDate(row.ngaynhap); 
       const ghichu = row.ghichu?.toString().trim() 
 
       const fromNode = markers.find(m => m.name?.trim() === fromName);
@@ -1003,7 +1030,7 @@ const handleImportExcel = (e) => {
           )}
           {selectedConnection && (
         <DraggableCard
-          title={`Chi tiết kết nối: ${selectedConnection.label || 'Không tên'}`}
+          title={`${selectedConnection.label || 'Không tên'}`}
           onClose={() => setSelectedConnection(null)}
           width={700}
         >
@@ -1019,7 +1046,7 @@ const handleImportExcel = (e) => {
                   <th>Đến</th>
                   <th>Loại cáp</th>
                    <th>Độ dài cáp</th>
-                  <th>Số sợi quang</th>
+                  <th>Ngày hòa mạng</th>
                 </tr>
               </thead>
               <tbody>
@@ -1028,7 +1055,7 @@ const handleImportExcel = (e) => {
                   <td>{markers.find(m => m.id === selectedConnection.to)?.name }</td>
                   <td>{selectedConnection.cableType +"FO"|| 'Không xác định'}</td>
                    <td>{selectedConnection.km +"Km"|| 'Không xác định'}</td>
-                  <td>{parseInt(selectedConnection.cableType)}</td>
+                  <td>{selectedConnection.ngaynhap}</td>
                 </tr>
               </tbody>
             </table>
@@ -1145,7 +1172,18 @@ const handleImportExcel = (e) => {
             
           >
              <Tooltip direction="bottom" offset={[0, -10]} permanent interactive={false}>
-              <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{m.name}</div>
+
+
+                                    <div style={{ textAlign: 'center' ,fontWeight: 'bold', fontSize: '10px' }}>
+                        {m.name || 'Trạm'}
+                        {m.ghichu && (
+                          <>
+                            <br />
+                            ({m.ghichu})
+                          </>
+                        )}
+                      </div>
+           
             </Tooltip>
             {/* <Popup>
               <b>{m.name}</b><br />
@@ -1267,7 +1305,15 @@ const handleImportExcel = (e) => {
       >
         {index === 0 && (
           <Tooltip direction="top" sticky>
-            {conn.label || 'Tuyến cáp'}
+         <div style={{ textAlign: 'center' }}>
+    {conn.label || 'Tuyến cáp'}
+    {conn.ghichu && (
+      <>
+        <br />
+        ({conn.ghichu})
+      </>
+    )}
+  </div>
           </Tooltip>
         )}
       </Polyline>
