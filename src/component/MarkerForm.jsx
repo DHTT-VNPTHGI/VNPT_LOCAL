@@ -74,7 +74,7 @@ const handleImportExcel = (e) => {
             name: row.name,
             type: "UPE",
             latlng: {"lat":lat,"lng" :lng},
-            ghichu:row.ghichu
+            ghichu:row.tentramhethong
           };
         } else {
           console.warn(`⚠️ Dòng ${index + 2} bị bỏ qua do thiếu hoặc sai định dạng.`);
@@ -144,11 +144,11 @@ const handleImportExcel = (e) => {
       />
     </div>
      <div className="mb-3">
-      <label className="form-label">Ghi chú:</label>
+      <label className="form-label">Tên Trạm Hệ Thống:</label>
       <input
         type="text"
         className="form-control"
-        placeholder="Nhập tên trạm"
+        placeholder="Nhập tên trạm hệ thống"
         value={formData.ghichu}
         onChange={(e) =>
           setFormData((prev) => ({ ...prev, ghichu: e.target.value,type:"UPE" }))
