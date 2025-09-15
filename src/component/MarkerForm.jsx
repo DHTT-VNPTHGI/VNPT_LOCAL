@@ -36,6 +36,9 @@ const MarkerForm = ({ initialData,markers, onSubmit, onCancel }) => {
   const handleSubmit = () => {
     if (formData.name.trim() && formData.type.trim()) {
       formData.name=(markers.length+1)+". "+formData.name
+     formData.latlng.lat=formData.lat
+     formData.latlng.lng=formData.lng
+      console.log(formData, )
       onSubmit(formData);
     }
   };
@@ -155,6 +158,33 @@ const handleImportExcel = (e) => {
         }
       />
     </div>
+      <div className="row mb-2">
+        
+          <label className="form-label">Lat</label>
+          <input
+            type="number"
+            className="form-control"
+            value={formData.lat}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, lat: parseFloat(e.target.value) }))
+            }
+          />
+      
+       
+      </div>
+       <div className="row mb-2">
+         <div className="col">
+          <label className="form-label">Lng</label>
+          <input
+            type="number"
+            className="form-control"
+            value={formData.lng}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, lng: parseFloat(e.target.value) }))
+            }
+          />
+        </div>
+       </div>
 
     {/* <div className="mb-3">
       <label className="form-label">Loại trạm:</label>

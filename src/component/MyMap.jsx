@@ -1195,13 +1195,13 @@ const handleImportExcel = (e) => {
       
 {spliceForm && (
   <DraggableCard
-    title="➕ Thêm mối hàn"
+    title="➕ Thêm Măng xoong"
     onClose={() => setSpliceForm(null)}
     width={300}
   >
     <div onClick={(e) => e.stopPropagation()}>
       <div className="mb-2">
-        <label className="form-label">Tên mối hàn</label>
+        <label className="form-label">Tên măng xoong</label>
         <input
           type="text"
           className="form-control"
