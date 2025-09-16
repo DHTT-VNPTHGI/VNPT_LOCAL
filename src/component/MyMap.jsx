@@ -762,7 +762,18 @@ const handleImportExcel = (e) => {
               onChange={(e) => setSelectedToIndex(e.target.value)}
             >
               <option value="" disabled>-- Chọn marker --</option>
-              {markers.map((m) =>
+              {markers
+  .slice()
+  .sort((a, b) => {
+    // Hàm lấy số thứ tự ở đầu chuỗi, ví dụ: "10. Trạm..." -> 10
+    const getNumber = (str) => {
+  const match = str.trim().match(/^(\d+)\./); 
+  return match ? parseInt(match[1], 10) : Infinity;
+};
+
+
+    return getNumber(a.name) - getNumber(b.name);
+  }).map((m) =>
                 m.id !== connectionPopup.fromId && (
                   <option key={m.id} value={m.id}>
                     {m.name || 'Marker'}
