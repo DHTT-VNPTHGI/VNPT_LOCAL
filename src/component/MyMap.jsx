@@ -693,7 +693,7 @@ const handleImportExcel = (e) => {
             zIndex: 1000,
           }}
         >
-          {menu.type === 'add' && <button onClick={handleAdd}>➕ Thêm Marker</button>}
+          {menu.type === 'add' && <button onClick={handleAdd}>➕ Thêm Trạm</button>}
           {menu.type === 'marker' && (
             <>
               <button onClick={handleEdit}>✏️ Sửa</button>

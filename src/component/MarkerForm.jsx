@@ -91,12 +91,12 @@ const handleImportExcel = (e) => {
     '⚠️ Không có dòng hợp lệ để import!\n\n' +
     'Yêu cầu: File Excel phải có đầy đủ 4 cột: name, type, lat, lng\n\n' +
     '📄 Ví dụ:\n' +
-    '+----------------------+--------------+-----------+------------+\n' +
-    '|        name          |    type      |   lat     |    lng     |\n' +
-    '+----------------------+--------------+-----------+------------+\n' +
-    '| Marker A             | UPE          | 9.757898  | 105.641654 |\n' +
-    '| Marker B             | Small Cell   | 9.609246  | 105.473545 |\n' +
-    '+----------------------+--------------+-----------+------------+'
+    '+----------------------+-----------+------------+---------------+\n' +
+    '|        name          |   lat     |    lng     |tentramhethong |\n' +
+    '+----------------------+-----------+------------+---------------+\n' +
+    '| Marker A             | 9.757898  | 105.641654 |  105.641654   |\n' +
+    '| Marker B             | 9.609246  | 105.473545 |  105.641654   |\n' +
+    '+----------------------+-----------+------------+---------------+'
   );
   return;
 }
@@ -130,7 +130,7 @@ const handleImportExcel = (e) => {
   }}
 >
   <div className="card-header bg-primary text-white fw-bold p-2">
-    {initialData?.editingIndex != null ? '✏️ Sửa Marker' : '➕ Thêm Marker Mới'}
+    {initialData?.editingIndex != null ? '✏️ Sửa Marker' : '➕ Thêm Trạm Mới'}
   </div>
 
   <div className="card-body p-2">
