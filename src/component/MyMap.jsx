@@ -623,6 +623,7 @@ const handleImportExcel = (e) => {
     const newConnections = [];
     let connect=[...connections]
     rows.forEach((row, index) => {
+       const id = row.id?.toString().trim();
       const fromName = row.from_node?.toString().trim();
       const toName = row.to_node?.toString().trim();
       const label = row.label?.toString().trim() || `Tuyến ${index + 1}`;
@@ -638,9 +639,13 @@ const handleImportExcel = (e) => {
         toast.warning(`⚠️ Không tìm thấy node "${fromName}" hoặc "${toName}" ở dòng ${index + 2}`);
         return;
       }
-
-      const conn = {
-        id: randomId("connect_"),
+      let checks=connections.filter(e=>e.id)
+      if (checks.length>0){
+        toast.error("ID "+id+" đã tồn tại")
+      }
+     else{
+       const conn = {
+        id: id,
         from: fromNode.id,
         to: toNode.id,
         label,
@@ -660,6 +665,7 @@ const handleImportExcel = (e) => {
       };
       connect.push(conn)
       newConnections.push(conn);
+     }
     });
 
     // Gửi lên server & cập nhật UI

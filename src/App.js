@@ -39,7 +39,7 @@ function App() {
       setIsLoggedIn(true);
       toast.success("Đăng nhập thành công")
     } else {
-      alert("Sai tài khoản hoặc mật khẩu!");
+      toast.error("Sai tài khoản hoặc mật khẩu!");
     }
       }
     )
@@ -52,7 +52,7 @@ function App() {
     if (username && password) {
       localStorage.setItem("username", username);
       localStorage.setItem("password", password);
-      UserService.update({username:username,password:password}).then(
+      UserService.update({id:username,username:username,password:password}).then(
         res=>{
           toast.success("Đăng kí tài khoản thành công")
         }
