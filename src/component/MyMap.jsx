@@ -621,7 +621,7 @@ const handleImportExcel = (e) => {
     const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
     const newConnections = [];
-
+    let connect=[...connections]
     rows.forEach((row, index) => {
       const fromName = row.from_node?.toString().trim();
       const toName = row.to_node?.toString().trim();
@@ -646,7 +646,7 @@ const handleImportExcel = (e) => {
         label,
         cableType,
           offsetIndex:
-        connections.filter(
+        connect.filter(
           (c) =>
             (c.from === fromNode.id && c.to === toNode.id) ||
             (c.from === toNode.id && c.to === fromNode.id)
@@ -658,7 +658,7 @@ const handleImportExcel = (e) => {
         color: getRandomColor(),
         splicePoints: []
       };
-
+      connect.push(conn)
       newConnections.push(conn);
     });
 
@@ -747,10 +747,11 @@ const handleImportExcel = (e) => {
             >
               <option value="">-- Chọn loại --</option>
               <option value="12FO">12FO</option>
+               <option value="16FO">16FO</option>
               <option value="24FO">24FO</option>
               <option value="48FO">48FO</option>
               <option value="96FO">96FO</option>
-              <option value="144FO">144FO</option>
+             
             </select>
           </div>
 
@@ -814,12 +815,7 @@ const handleImportExcel = (e) => {
       
 
           <div className="d-flex justify-content-end gap-2">
-           
-
-
-
-
-                         <input
+                                   <input
                           type="file"
                           accept=".xlsx, .xls"
                           style={{ display: 'none' }}
